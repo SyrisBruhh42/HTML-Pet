@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pixel Slime Companion</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="game-container">
+    <!-- Game Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Top Floating HUD -->
+    <div id="hud-top">
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-label">HEALTH</span>
+          <span id="hp-text" class="stat-val">100 / 100</span>
+        </div>
+        <div class="bar-container">
+          <div id="hp-bar" class="bar-fill hp-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-label">HUNGER</span>
+          <span id="hunger-text" class="stat-val">100%</span>
+        </div>
+        <div class="bar-container">
+          <div id="hunger-bar" class="bar-fill hunger-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-label">LEVEL <span id="level-val">1</span></span>
+          <span id="xp-text" class="stat-val">0 / 100 Quality</span>
+        </div>
+        <div class="bar-container">
+          <div id="xp-bar" class="bar-fill xp-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <div class="hud-coins">
+        <span class="coin-icon">🪙</span>
+        <span id="gold-val">50</span>
+      </div>
+    </div>
+
+    <!-- Quick Action / Menu Buttons Bar -->
+    <div id="hud-bottom">
+      <button class="pixel-btn nav-btn" data-target="feed-modal">🍎 Inventory</button>
+      <button class="pixel-btn nav-btn" data-target="farm-modal">🌱 Farming</button>
+      <button class="pixel-btn nav-btn" data-target="upgrades-modal">🪙 Upgrades</button>
+      <button class="pixel-btn nav-btn" data-target="log-modal">📜 Log</button>
+    </div>
+
+    <!-- Modals / Folder Popups -->
+    <div id="modal-overlay" class="hidden">
+      <!-- Feeding & Inventory Folder Modal -->
+      <div id="feed-modal" class="folder-modal hidden">
+        <div class="folder-header">
+          <h2>📁 Food & Inventory Folder</h2>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="folder-body">
+          <div class="toggle-setting">
+            <label class="switch-label">
+              <input type="checkbox" id="toggle-confirm">
+              <span class="slider"></span>
+              <span class="toggle-text">Require Confirmation on Feed</span>
+            </label>
+          </div>
+          <div class="inventory-section">
+            <h3>Available Supplies</h3>
+            <div id="inventory-grid" class="item-grid">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upgrades & Shop Folder Modal -->
+      <div id="upgrades-modal" class="folder-modal hidden">
+        <div class="folder-header">
+          <h2>🪙 Upgrades & Shop</h2>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="folder-body">
+          <div class="upgrade-card">
+            <h3>🌱 Expand Farm Plot</h3>
+            <p>Add an extra planting plot to grow more food.</p>
+            <p><strong>Cost: 100 Gold</strong></p>
+            <button id="buy-plot-btn" class="pixel-btn success">Purchase Plot</button>
+          </div>
+          <div class="upgrade-card" style="margin-top: 12px;">
+            <h3>💖 Heal Pet Emergency Kit</h3>
+            <p>Instantly restore 30 HP to your slime companion.</p>
+            <p><strong>Cost: 30 Gold</strong></p>
+            <button id="buy-heal-btn" class="pixel-btn primary">Buy Heal Kit</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Farm / Plots Folder Modal -->
+      <div id="farm-modal" class="folder-modal hidden">
+        <div class="folder-header">
+          <h2>🌱 Farm Plots Folder</h2>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="folder-body">
+          <div id="plots-container" class="plots-grid">
+            <!-- Dynamically populated farm plots -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Combat / Event Log Modal -->
+      <div id="log-modal" class="folder-modal hidden">
+        <div class="folder-header">
+          <h2>📜 D&D Encounter Log</h2>
+          <button class="close-btn">&times;</button>
+        </div>
+        <div class="folder-body">
+          <div class="raid-controls">
+            <button id="trigger-raid-btn" class="pixel-btn primary">⚔️ Trigger Raid Check (Test D20)</button>
+          </div>
+          <div id="combat-log" class="log-list">
+            <!-- Log entries go here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed Confirmation Dialog Popup -->
+      <div id="confirm-feed-dialog" class="dialog-popup hidden">
+        <h3>Confirm Feed</h3>
+        <p id="confirm-dialog-msg">Are you sure you want to feed this item to your slime?</p>
+        <div class="dialog-actions">
+          <button id="confirm-yes-btn" class="pixel-btn success">Feed Pet</button>
+          <button id="confirm-no-btn" class="pixel-btn danger">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/farming.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
