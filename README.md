@@ -33,3 +33,13 @@ The owner’s intended reward and offline-balance rules must be established befo
 [Project Office](https://github.com/SyrisBruhh42/Project-Office/blob/main/hub/START-HERE.md) is the coordination entry point for authorized collaborators. Select route `html-pet` and mission `MISSION-HTML-PET` to recover recorded context, next actions and authority boundaries. Office access may be private; it is not required to read this repository or its startup guidance.
 
 When Office is unavailable, continue from this repository’s applicable instructions and the authorized task. State any missing context explicitly. Do not copy private Office records, conversations or operational history into public source, issues or pull requests. An Office record is coordination context, not permission to expand the source task or a substitute for source evidence.
+
+<!-- lfs-alignment:begin v1 -->
+## LFS alignment
+
+Project role: Independent browser pixel-slime pet experiment.
+
+This project keeps its own purpose and required features while sharing useful LFS practices: clear ownership, reusable capabilities, scoped access, evidence-based validation and recoverable work. Adopting these practices does not make this repository a deployed LFS service.
+
+Use this README and local project documentation for scope, setup and status. Contributor guidance is in [AGENTS.md](AGENTS.md). A policy update is not proof of tested or delivered functionality.
+<!-- lfs-alignment:end -->
