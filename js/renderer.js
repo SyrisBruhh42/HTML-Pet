@@ -77,7 +77,7 @@ class Renderer {
 
     // Center point of screen
     const centerX = width / 2;
-    const centerY = height / 2 + 20;
+    const centerY = height / 2 + Math.min(20, height / 4);
 
     // 1. Draw Environment (Shrinks relative to Pet scale)
     ctx.save();
@@ -85,7 +85,9 @@ class Renderer {
 
     // Relative scaling: As pet level/scale grows, environment shrinks
     const layout = this.gardenLayout(this.state.data.farmPlots.length);
-    const fit = Math.min(width / (layout.worldSize + 40), height / (layout.worldSize + 40));
+    const availableWidth = 2 * Math.min(centerX, width - centerX);
+    const availableHeight = 2 * Math.min(centerY, height - centerY);
+    const fit = Math.min(availableWidth / (layout.worldSize + 40), availableHeight / (layout.worldSize + 40));
     const envScale = Math.min(1 / Math.pow(scaleFactor, 0.7), fit);
     ctx.scale(envScale, envScale);
 

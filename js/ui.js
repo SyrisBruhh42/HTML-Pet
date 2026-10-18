@@ -209,7 +209,14 @@ class UIManager {
       });
       card.append(title, detail, button); grid.appendChild(card);
     }
-    if (focused) grid.querySelector(`[data-equipment-id="${focused}"]`)?.focus();
+    if (focused) {
+      const replacement = grid.querySelector(`[data-equipment-id="${focused}"]`);
+      if (replacement?.disabled) {
+        const status = document.getElementById('shop-status');
+        status.textContent = this.state.canPlay ? 'This equipment is currently unavailable.' : this.state.status.message;
+        status.focus();
+      } else replacement?.focus();
+    }
   }
 
   renderInventory() {
@@ -416,6 +423,9 @@ class UIManager {
       document.getElementById('export-save-btn').disabled = !this.state.loaded;
       document.getElementById('export-original-btn').disabled = this.state.originalRaw === null;
       document.querySelectorAll('[data-game-action]').forEach(el => { el.disabled = !this.state.canPlay; });
+      // Autosave emits status without an onChange event. Restore the shop's
+      // gold, health and unlock constraints after the general session guard.
+      if (!document.getElementById('upgrades-modal').classList.contains('hidden')) this.renderUpgrades();
       try {
         const storage = this.state.getStorage();
         const keys = [];

@@ -169,3 +169,58 @@ test('world draws soil for every owned plot including the fifth and later', () =
   const ctx = { fillRect(x,y,w,h) { if (w===80 && h===80) soil++; }, strokeRect() {}, fillText() {} };
   renderer.drawEnvironment(ctx); assert.equal(soil, 28);
 });
+
+test('actual rendered soil stays inside short viewports as the garden expands', () => {
+  for (const count of [0, 4, 5, 100, 1000, 4000]) for (const [width, height] of [[1,1], [320,320], [600,400], [1280,720]]) {
+    const renderer = Object.create(Renderer.prototype);
+    renderer.state = { data: GameState.fresh(epoch) };
+    renderer.state.data.farmPlots = Array.from({ length: count }, (_, id) => ({ id, state: 'empty' }));
+    renderer.canvas = { width, height }; renderer.bounceOffset = 0;
+    renderer.updateAnimation = renderer.drawSlimePet = renderer.drawAuraParticles = () => {};
+    let transform = { x: 0, y: 0, sx: 1, sy: 1 }, soil = 0; const stack = [];
+    renderer.ctx = {
+      clearRect() {}, strokeRect() {}, fillText() {},
+      save() { stack.push({ ...transform }); }, restore() { transform = stack.pop(); },
+      translate(x,y) { transform.x += x * transform.sx; transform.y += y * transform.sy; },
+      scale(x,y) { transform.sx *= x; transform.sy *= y; },
+      fillRect(x,y,w,h) {
+        if (w !== 80 || h !== 80) return;
+        soil++;
+        assert.ok(transform.x + x * transform.sx >= 0);
+        assert.ok(transform.y + y * transform.sy >= 0);
+        assert.ok(transform.x + (x + w) * transform.sx <= width);
+        assert.ok(transform.y + (y + h) * transform.sy <= height);
+      }
+    };
+    renderer.render(); assert.equal(soil, count);
+  }
+});
+
+test('autosave, save refusal and retry retain shop availability constraints', () => {
+  // A small DOM adapter exercises the actual UI callbacks without introducing
+  // a browser dependency into this domain suite. Native DOM/focus is separate.
+  const UIManager = require('../js/ui.js');
+  const priorDocument = global.document, priorUpgrades = global.Upgrades;
+  const elements = new Map();
+  const element = () => ({ disabled: false, dataset: {}, children: [], classList: { contains() { return false; }, toggle() {} },
+    setAttribute() {}, addEventListener() {}, focus() {}, append(...children) { this.children.push(...children); },
+    appendChild(child) { this.children.push(child); }, replaceChildren() { this.children = []; }, querySelector() { return null; } });
+  const get = id => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
+  const buttons = () => [get('buy-plot-btn'), get('buy-heal-btn'), ...get('equipment-grid').children.map(card => card.children[2])];
+  try {
+    global.Upgrades = Upgrades;
+    global.document = { activeElement: { dataset: {} }, getElementById: get, createElement: element, querySelectorAll: buttons };
+    const { state, storage } = fixture();
+    const ui = Object.create(UIManager.prototype); ui.state = state; ui.renderHUD = () => {};
+    ui.bindRecovery(); assert.ok(buttons().every(button => button.disabled));
+    state.save(); assert.ok(buttons().every(button => button.disabled));
+    state.data.gold = 200; state.data.pet.hp = 70; state.save();
+    assert.deepEqual(buttons().map(button => button.disabled), [false, false, false, true, true]);
+    storage.fail = true; state.save(); assert.ok(buttons().every(button => button.disabled));
+    storage.fail = false; state.retry();
+    assert.deepEqual(buttons().map(button => button.disabled), [false, false, false, true, true]);
+  } finally {
+    if (priorDocument === undefined) delete global.document; else global.document = priorDocument;
+    if (priorUpgrades === undefined) delete global.Upgrades; else global.Upgrades = priorUpgrades;
+  }
+});
