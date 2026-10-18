@@ -15,6 +15,8 @@ class UIManager {
 
     this.initDOM();
     this.bindEvents();
+    this.recoveryRequest = 0;
+    this.recoveryDialog = new RecoveryDialog({ state, document, report: (message, error) => this.reportRecovery(message, error) });
     this.bindRecovery();
   }
 
@@ -108,6 +110,7 @@ class UIManager {
       if (!document.getElementById('upgrades-modal').classList.contains('hidden')) this.renderUpgrades();
     });
     document.addEventListener('keydown', event => {
+      if (this.recoveryDialog?.isOpen()) return;
       if (this.modalOverlay.classList.contains('hidden')) return;
       if (event.key === 'Escape') this.closeModals();
       if (event.key !== 'Tab') return;
@@ -403,13 +406,17 @@ class UIManager {
     }
   }
 
-  restoreBackup(raw) {
-    try {
-      if (raw.length > 5 * 1024 * 1024) throw new Error('Backup exceeds the 5 MB import limit.');
-      GameState.decode(raw, Date.now());
-      if (confirm('Restore this backup? The current stored save will be copied to recovery storage first.')) return this.state.replace(raw);
-    } catch (error) { alert(`Cannot import: ${error.message}`); }
-    return false;
+  reportRecovery(message, error = false) {
+    const feedback = document.getElementById('recovery-status');
+    feedback.setAttribute('role', error ? 'alert' : 'status');
+    feedback.textContent = message;
+    feedback.hidden = false;
+    document.getElementById('save-tools').open = true;
+    if (error) feedback.focus();
+  }
+
+  restoreBackup(raw, options) {
+    return this.recoveryDialog.review(raw, options);
   }
 
   bindRecovery() {
@@ -454,28 +461,41 @@ class UIManager {
       this.download(this.state.originalRaw, 'pixel-pet-original.json'));
     document.getElementById('export-recovery-btn').addEventListener('click', () => {
       try { this.download(this.state.getStorage().getItem(recoverySelect.value), 'pixel-pet-recovery.json'); }
-      catch { alert('Recovery storage is unavailable. The original save has not been removed.'); }
+      catch { this.reportRecovery('Recovery storage is unavailable. The original save has not been removed.', true); }
     });
     document.getElementById('retry-save-btn').addEventListener('click', () => {
       this.state.retry(); this.renderHUD();
     });
-    document.getElementById('import-text-btn').addEventListener('click', () => {
+    document.getElementById('import-text-btn').addEventListener('click', async () => {
+      if (this.recoveryDialog.isOpen()) return;
+      ++this.recoveryRequest;
       const input = document.getElementById('import-text');
-      if (this.restoreBackup(input.value)) input.value = '';
+      const raw = input.value;
+      if (await this.restoreBackup(raw) && input.value === raw) input.value = '';
     });
     document.getElementById('import-save').addEventListener('change', async event => {
       const file = event.target.files[0];
-      if (!file) return;
+      if (!file || this.recoveryDialog.isOpen()) return;
+      const request = ++this.recoveryRequest;
+      const opener = event.target;
       try {
-        if (file.size > 5 * 1024 * 1024) throw new Error('This file exceeds the 5 MB import limit. Your current pet is unchanged.');
+        if (file.size > 5 * 1024 * 1024) throw new Error('This file exceeds the 5 MB import limit.');
         const raw = await file.text();
-        this.restoreBackup(raw);
-      } catch (error) { alert(`Cannot import: ${error.message}`); }
-      event.target.value = '';
+        if (request !== this.recoveryRequest) return;
+        // Keep file text available after cancel, validation or storage failure.
+        const input = document.getElementById('import-text');
+        input.value = raw;
+        if (await this.restoreBackup(raw, { opener }) && input.value === raw) input.value = '';
+      } catch (error) {
+        if (request === this.recoveryRequest) this.reportRecovery(`Cannot import: ${error.message}. Keep your backup.`, true);
+      } finally {
+        if (request === this.recoveryRequest) event.target.value = '';
+      }
     });
     document.getElementById('new-pet-btn').addEventListener('click', () => {
-      if (confirm('Start a new pet? Your current stored save will be preserved in recovery storage first. Download a backup before continuing.'))
-        this.state.replace(JSON.stringify(GameState.fresh(Date.now())));
+      if (this.recoveryDialog.isOpen()) return;
+      ++this.recoveryRequest;
+      this.restoreBackup(JSON.stringify(GameState.fresh(Date.now())), { kind: 'new' });
     });
     update();
   }

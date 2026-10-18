@@ -190,6 +190,11 @@ class GameState {
       const storage = this.getStorage();
       const existing = storage.getItem(this.key);
       if (existing !== this.lastSavedRaw) return this.pause('conflict', 'Stored game changed. Reload before replacing it; download this tab first.');
+      // A failed autosave can leave earned progress only in this tab. Preserve
+      // that distinct snapshot as well as byte-exact stored data before either
+      // import or a new pet can replace it. Any failed copy stops replacement.
+      const current = this.loaded ? JSON.stringify(this.data) : null;
+      if (current !== null && current !== existing) this.preserve(current);
       this.preserve(existing);
       const encoded = JSON.stringify(decoded.data);
       storage.setItem(this.key, encoded);
