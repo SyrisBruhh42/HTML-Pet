@@ -10,6 +10,12 @@ class Renderer {
     this.auraParticles = [];
     this.bounceOffset = 0;
     this.bounceVelocity = 0;
+    this.motionPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    this.reducedMotion = !!this.motionPreference?.matches;
+    this.motionPreference?.addEventListener?.('change', event => {
+      this.reducedMotion = event.matches;
+      if (this.reducedMotion) this.clearMotion();
+    });
 
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -21,6 +27,7 @@ class Renderer {
   }
 
   triggerFeedAura() {
+    if (this.reducedMotion) return;
     // Create aura particle burst
     for (let i = 0; i < 30; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -40,6 +47,7 @@ class Renderer {
   }
 
   updateAnimation() {
+    if (this.reducedMotion) { this.clearMotion(); return; }
     // Bounce physics
     this.bounceOffset += this.bounceVelocity;
     if (this.bounceOffset < 0) {
@@ -59,6 +67,12 @@ class Renderer {
         this.auraParticles.splice(i, 1);
       }
     }
+  }
+
+  clearMotion() {
+    this.auraParticles.length = 0;
+    this.bounceOffset = 0;
+    this.bounceVelocity = 0;
   }
 
   render() {
@@ -209,7 +223,7 @@ class Renderer {
 
   drawSlimePet(ctx, pet) {
     const time = Date.now() * 0.003;
-    const squish = Math.sin(time) * 4;
+    const squish = this.reducedMotion ? 0 : Math.sin(time) * 4;
 
     const baseWidth = 100;
     const baseHeight = 80;
