@@ -89,10 +89,12 @@ class UIManager {
     });
 
     const shopAction = action => {
+      const previousFocus = document.activeElement;
       if (!this.allowAction()) return;
       const result = action();
       document.getElementById('shop-status').textContent = result.message;
       this.renderUpgrades();
+      if (previousFocus?.disabled) document.getElementById('shop-status').focus();
     };
     document.getElementById('buy-plot-btn').addEventListener('click', () => shopAction(() => this.upgrades.buyPlot()));
     document.getElementById('buy-heal-btn').addEventListener('click', () => shopAction(() => this.upgrades.buyHealKit()));
