@@ -2,20 +2,24 @@
  * UI Overlay & Modal Handlers
  */
 class UIManager {
-  constructor(state, farmingMgr, combatEngine, renderer) {
+  constructor(state, farmingMgr, combatEngine, renderer, progression) {
     this.state = state;
     this.farmingMgr = farmingMgr;
     this.combatEngine = combatEngine;
     this.renderer = renderer;
+    this.progression = progression;
+    this.beforeAction = () => {};
 
     this.pendingFeedCropId = null;
 
     this.initDOM();
     this.bindEvents();
+    this.bindRecovery();
   }
 
   initDOM() {
     this.hpText = document.getElementById('hp-text');
+    this.careText = document.getElementById('care-text');
     this.hpBar = document.getElementById('hp-bar');
     this.hungerText = document.getElementById('hunger-text');
     this.hungerBar = document.getElementById('hunger-bar');
@@ -57,6 +61,7 @@ class UIManager {
 
     // Toggle confirm checkbox
     this.toggleConfirm.addEventListener('change', (e) => {
+      if (!this.allowAction()) { this.renderHUD(); return; }
       this.state.data.settings.confirmFeed = e.target.checked;
       this.state.save();
     });
@@ -77,6 +82,7 @@ class UIManager {
 
     // Trigger Raid Test Button
     document.getElementById('trigger-raid-btn').addEventListener('click', () => {
+      if (!this.allowAction()) return;
       this.combatEngine.triggerRaid();
       this.renderLog();
     });
@@ -85,10 +91,12 @@ class UIManager {
     const buyPlotBtn = document.getElementById('buy-plot-btn');
     if (buyPlotBtn) {
       buyPlotBtn.addEventListener('click', () => {
+        if (!this.allowAction()) return;
         if (this.state.data.gold >= 100) {
+          const newId = this.state.data.farmPlots.reduce((max, plot) => Math.max(max, plot.id), -1) + 1;
+          if (!Number.isSafeInteger(newId)) { alert('No further plot IDs are available. Your gold was kept.'); return; }
           this.state.data.gold -= 100;
-          const newId = this.state.data.farmPlots.length;
-          this.state.data.farmPlots.push({ id: newId, state: 'empty', cropId: null, plantedAt: null });
+          this.state.data.farmPlots.push({ id: newId, state: 'empty', cropId: null, plantedAt: null, growthSec: 0 });
           this.state.notify();
           alert(`🎉 Success! Purchased Farm Plot #${newId + 1}`);
         } else {
@@ -101,6 +109,7 @@ class UIManager {
     const buyHealBtn = document.getElementById('buy-heal-btn');
     if (buyHealBtn) {
       buyHealBtn.addEventListener('click', () => {
+        if (!this.allowAction()) return;
         const pet = this.state.data.pet;
         if (this.state.data.gold >= 30) {
           this.state.data.gold -= 30;
@@ -114,16 +123,33 @@ class UIManager {
     }
 
     // Listen to state changes
-    this.state.onChange(() => this.renderHUD());
+    this.state.onChange(() => {
+      this.renderHUD();
+      if (!document.getElementById('feed-modal').classList.contains('hidden')) this.renderInventory();
+      if (!document.getElementById('farm-modal').classList.contains('hidden')) this.renderFarmPlots();
+      if (!document.getElementById('log-modal').classList.contains('hidden')) this.renderLog();
+    });
+    document.addEventListener('keydown', event => {
+      if (this.modalOverlay.classList.contains('hidden')) return;
+      if (event.key === 'Escape') this.closeModals();
+      if (event.key !== 'Tab') return;
+      const focusable = [...this.modalOverlay.querySelectorAll('button, select, input')]
+        .filter(el => !el.disabled && el.offsetParent !== null);
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    });
   }
 
   openModal(modalId) {
+    this.lastFocus = document.activeElement;
     this.modalOverlay.classList.remove('hidden');
     document.querySelectorAll('.folder-modal').forEach(m => m.classList.add('hidden'));
 
     const targetModal = document.getElementById(modalId);
     if (targetModal) {
       targetModal.classList.remove('hidden');
+      targetModal.querySelector('button')?.focus();
     }
 
     if (modalId === 'feed-modal') this.renderInventory();
@@ -135,10 +161,18 @@ class UIManager {
     this.modalOverlay.classList.add('hidden');
     document.querySelectorAll('.folder-modal').forEach(m => m.classList.add('hidden'));
     this.confirmDialog.classList.add('hidden');
+    this.pendingFeedCropId = null;
+    this.lastFocus?.focus();
   }
 
   renderHUD() {
     const pet = this.state.data.pet;
+
+    const careHours = pet.wellFedDurationSec / 3600;
+    const ready = Math.floor(careHours / CONFIG.HEALTH_INCREASE_REQ_HOURS);
+    this.careText.textContent = ready > 0
+      ? `Care reward ready (${ready}): feed for +${CONFIG.CARE_HEALTH_REWARD} maximum HP`
+      : `Care: ${careHours.toFixed(1)} / ${CONFIG.HEALTH_INCREASE_REQ_HOURS} hours · keep food and health at 90%+`;
 
     // HP
     this.hpText.textContent = `${Math.floor(pet.hp)} / ${Math.floor(pet.maxHp)}`;
@@ -170,8 +204,10 @@ class UIManager {
       const config = CONFIG.CROPS[cropId];
       const item = inventory[cropId] || { count: 0, ageHours: 0 };
 
-      const card = document.createElement('div');
+      const card = document.createElement('button');
+      card.type = 'button';
       card.className = 'item-card';
+      card.disabled = !this.state.canPlay || item.count <= 0;
       if (item.count <= 0) card.style.opacity = '0.5';
 
       // Food quality degradation calculation
@@ -209,61 +245,8 @@ class UIManager {
   }
 
   executeFeed(cropId) {
-    const config = CONFIG.CROPS[cropId];
-    const inventory = this.state.data.inventory;
-    const pet = this.state.data.pet;
-
-    if (!config || !inventory[cropId] || inventory[cropId].count <= 0) return;
-
-    // Deduct food item
-    inventory[cropId].count -= 1;
-
-    // Quality calculation
-    const ageHours = inventory[cropId].ageHours || 0;
-    const qualityFactor = Math.max(
-      CONFIG.MIN_FOOD_QUALITY_RATIO,
-      1 - (ageHours / CONFIG.FOOD_AGE_DECAY_HOURS)
-    );
-    const effectiveQuality = config.qualityRating * qualityFactor;
-
-    // 1. Hunger restoration
-    const hungerGain = config.hungerRestore;
-    const wasFullHunger = pet.hunger >= CONFIG.WELL_FED_HUNGER_THRESHOLD;
-    pet.hunger = Math.min(pet.maxHunger, pet.hunger + hungerGain);
-
-    // 2. Health restore condition:
-    // "Feeding only increases health if pet is at full health and food for at least 24hrs"
-    const wasFullHealth = pet.hp >= pet.maxHp;
-    if (wasFullHealth && wasFullHunger && pet.wellFedDurationSec >= CONFIG.HEALTH_INCREASE_REQ_HOURS * 3600) {
-      pet.hp = Math.min(pet.maxHp, pet.hp + 10);
-    }
-
-    // 3. XP / Level Growth:
-    // If hunger is saturated >= 90%, excess food converts into Level XP
-    pet.cumulativeFoodQuality += effectiveQuality;
-
-    // Check Level Up
-    if (pet.cumulativeFoodQuality >= pet.requiredQualityForNextLevel) {
-      pet.level += 1;
-      pet.cumulativeFoodQuality -= pet.requiredQualityForNextLevel;
-
-      // Stat Increases
-      pet.scale += CONFIG.SIZE_INCREASE_PER_LEVEL;
-      pet.maxHp = Math.floor(pet.maxHp * (1 + CONFIG.MAX_HEALTH_INCREASE_PER_LEVEL));
-      pet.hp = pet.maxHp; // Refill HP on level up
-      pet.requiredQualityForNextLevel = Math.floor(pet.maxHp); // XP req equals total health points
-
-      // Log level up
-      this.state.data.logs.unshift({
-        timestamp: new Date().toLocaleTimeString(),
-        text: `🎉 LEVEL UP! Slime reached Level ${pet.level}! Size increased and Max HP grew to ${pet.maxHp}!`,
-        type: 'crit-win'
-      });
-    }
-
-    // Aura Effect & Bounce
+    if (!this.allowAction() || !this.progression.feed(cropId)) return;
     this.renderer.triggerFeedAura();
-
     this.state.notify();
     this.renderInventory();
   }
@@ -271,6 +254,7 @@ class UIManager {
   renderFarmPlots() {
     this.plotsContainer.innerHTML = '';
     const plots = this.state.data.farmPlots;
+    this.farmSignature = plots.map(plot => `${plot.id}:${plot.state}`).join('|');
 
     plots.forEach(plot => {
       const card = document.createElement('div');
@@ -293,9 +277,9 @@ class UIManager {
         `;
       } else if (plot.state === 'planted') {
         const crop = CONFIG.CROPS[plot.cropId];
-        const elapsed = (Date.now() - plot.plantedAt) / 1000;
+        const elapsed = plot.growthSec;
         const remaining = Math.max(0, Math.ceil(crop.growTimeSec - elapsed));
-        statusMsg = `Growing ${crop.icon} ${crop.name}<br>(${remaining}s left)`;
+        statusMsg = `Growing ${crop.icon} ${crop.name}<br><span class="plot-countdown" data-plot="${plot.id}">(${remaining}s left)</span>`;
         actionBtn = `<button class="pixel-btn" disabled>Growing...</button>`;
       } else if (plot.state === 'ready') {
         const crop = CONFIG.CROPS[plot.cropId];
@@ -315,6 +299,7 @@ class UIManager {
     // Event listeners for plant/harvest
     this.plotsContainer.querySelectorAll('.plant-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        if (!this.allowAction()) return;
         const plotId = parseInt(e.target.getAttribute('data-plot'));
         const select = this.plotsContainer.querySelector(`select[data-plot="${plotId}"]`);
         const cropId = select.value;
@@ -331,6 +316,7 @@ class UIManager {
 
     this.plotsContainer.querySelectorAll('.harvest-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        if (!this.allowAction()) return;
         const plotId = parseInt(e.target.getAttribute('data-plot'));
         this.farmingMgr.harvestPlot(plotId);
         this.renderFarmPlots();
@@ -350,10 +336,125 @@ class UIManager {
     logs.forEach(log => {
       const entry = document.createElement('div');
       entry.className = `log-entry ${log.type || ''}`;
-      entry.innerHTML = `<strong>[${log.timestamp}]</strong> ${log.text}`;
+      const time = document.createElement('strong');
+      time.textContent = `[${log.timestamp}] `;
+      entry.append(time, document.createTextNode(log.text));
       this.combatLog.appendChild(entry);
     });
   }
+
+  allowAction() { this.beforeAction(); return this.state.canPlay; }
+
+  refreshOpenFarm() {
+    if (document.getElementById('farm-modal').classList.contains('hidden')) return;
+    const plots = this.state.data.farmPlots;
+    const signature = plots.map(plot => `${plot.id}:${plot.state}`).join('|');
+    if (signature !== this.farmSignature) { this.renderFarmPlots(); return; }
+    this.plotsContainer.querySelectorAll('.plot-countdown').forEach(label => {
+      const plot = plots.find(item => item.id === Number(label.dataset.plot));
+      label.textContent = `(${Math.max(0, Math.ceil(CONFIG.CROPS[plot.cropId].growTimeSec - plot.growthSec))}s left)`;
+    });
+  }
+
+  renderClockStatus(backwards) {
+    const notice = document.getElementById('clock-status');
+    notice.hidden = !backwards;
+    notice.textContent = backwards ? 'Your clock moved backwards. Time progress is paused until it catches up; earned progress is kept.' : '';
+  }
+
+  download(raw, name) {
+    if (raw === null) return;
+    const preview = document.getElementById('backup-preview');
+    const text = document.getElementById('backup-text');
+    preview.hidden = false;
+    text.value = raw;
+    text.focus(); text.select();
+    try {
+      const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url; link.download = name;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      document.getElementById('save-status').textContent = 'Download could not start. Your exact backup text is selected below; copy it into a file and keep it safe.';
+    }
+  }
+
+  restoreBackup(raw) {
+    try {
+      if (raw.length > 5 * 1024 * 1024) throw new Error('Backup exceeds the 5 MB import limit.');
+      GameState.decode(raw, Date.now());
+      if (confirm('Restore this backup? The current stored save will be copied to recovery storage first.')) return this.state.replace(raw);
+    } catch (error) { alert(`Cannot import: ${error.message}`); }
+    return false;
+  }
+
+  bindRecovery() {
+    const panel = document.getElementById('save-tools');
+    const recoverySelect = document.getElementById('recovery-select');
+    const update = () => {
+      document.getElementById('save-status').textContent = this.state.status.message;
+      document.getElementById('save-panel').classList.toggle('save-problem', !this.state.canPlay);
+      if (!this.state.canPlay && this.state.status.kind !== 'loading') panel.open = true;
+      this.renderHUD();
+      document.getElementById('export-save-btn').disabled = !this.state.loaded;
+      document.getElementById('export-original-btn').disabled = this.state.originalRaw === null;
+      document.querySelectorAll('[data-game-action]').forEach(el => { el.disabled = !this.state.canPlay; });
+      try {
+        const storage = this.state.getStorage();
+        const keys = [];
+        for (let i = 0; i < storage.length; i++) {
+          const key = storage.key(i);
+          if (key?.startsWith(`${this.state.key}:recovery:`)) keys.push(key);
+        }
+        const signature = keys.sort().join('|');
+        if (signature !== this.recoverySignature) {
+          this.recoverySignature = signature;
+          recoverySelect.replaceChildren();
+          keys.reverse().forEach((key, index) => {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = `Recovery ${index + 1}: ${new Date(Number(key.split(':')[2])).toLocaleString()}`;
+            recoverySelect.appendChild(option);
+          });
+        }
+        document.getElementById('export-recovery-btn').disabled = !keys.length;
+      } catch { document.getElementById('export-recovery-btn').disabled = true; }
+    };
+    this.state.onStatus(update);
+    document.getElementById('export-save-btn').addEventListener('click', () =>
+      this.download(this.state.exportCurrent(), 'pixel-pet-backup.json'));
+    document.getElementById('export-original-btn').addEventListener('click', () =>
+      this.download(this.state.originalRaw, 'pixel-pet-original.json'));
+    document.getElementById('export-recovery-btn').addEventListener('click', () => {
+      try { this.download(this.state.getStorage().getItem(recoverySelect.value), 'pixel-pet-recovery.json'); }
+      catch { alert('Recovery storage is unavailable. The original save has not been removed.'); }
+    });
+    document.getElementById('retry-save-btn').addEventListener('click', () => {
+      this.state.retry(); this.renderHUD();
+    });
+    document.getElementById('import-text-btn').addEventListener('click', () => {
+      const input = document.getElementById('import-text');
+      if (this.restoreBackup(input.value)) input.value = '';
+    });
+    document.getElementById('import-save').addEventListener('change', async event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        if (file.size > 5 * 1024 * 1024) throw new Error('This file exceeds the 5 MB import limit. Your current pet is unchanged.');
+        const raw = await file.text();
+        this.restoreBackup(raw);
+      } catch (error) { alert(`Cannot import: ${error.message}`); }
+      event.target.value = '';
+    });
+    document.getElementById('new-pet-btn').addEventListener('click', () => {
+      if (confirm('Start a new pet? Your current stored save will be preserved in recovery storage first. Download a backup before continuing.'))
+        this.state.replace(JSON.stringify(GameState.fresh(Date.now())));
+    });
+    update();
+  }
+
 }
 
-window.UIManager = UIManager;
+if (typeof window !== 'undefined') window.UIManager = UIManager;
+if (typeof module !== 'undefined') module.exports = UIManager;

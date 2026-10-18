@@ -1,136 +1,103 @@
-/**
- * Main Application Lifecycle, Loop, and Offline Time Catch-up
- */
+/** Lifecycle: one elapsed-time path, with raids only during visible, unsuspended play. */
 class App {
   constructor() {
     this.state = window.gameState;
-    this.state.load();
-
-    this.canvas = document.getElementById('game-canvas');
-    this.renderer = new Renderer(this.canvas, this.state);
+    this.writerLease = false;
+    this.sessionGeneration = 0;
+    this.state.writerCheck = () => this.writerLease;
+    this.renderer = new Renderer(document.getElementById('game-canvas'), this.state);
+    this.progression = new Progression(this.state);
     this.farmingMgr = new FarmingManager(this.state);
     this.combatEngine = new EncounterEngine(this.state);
-    this.ui = new UIManager(this.state, this.farmingMgr, this.combatEngine, this.renderer);
-
-    this.lastTick = Date.now();
-    this.raidTimerSec = 0;
-    this.RAID_INTERVAL_SEC = 90; // Automatic raid check every 90 seconds
-
-    this.processOfflineTime();
+    this.ui = new UIManager(this.state, this.farmingMgr, this.combatEngine, this.renderer, this.progression);
+    this.ui.beforeAction = () => this.advance(!document.hidden);
+    this.openSession();
+    this.lastSaveFrame = 0;
+    this.lastUpdateFrame = 0;
+    document.addEventListener('visibilitychange', () => {
+      this.advance(false);
+      if (this.state.canPlay) this.state.notify();
+    });
+    window.addEventListener('pagehide', () => {
+      this.sessionGeneration += 1; // A delayed lock grant must not reopen a hidden/disposed page.
+      this.advance(false);
+      if (this.state.canPlay) this.state.save();
+      this.writerLease = false;
+      this.state.canPlay = false;
+      this.releaseWriter?.();
+      this.releaseWriter = null;
+    });
+    window.addEventListener('pageshow', event => { if (event.persisted) this.openSession(); });
+    window.addEventListener('storage', event => {
+      if (event.key === this.state.key || event.key === null) {
+        this.state.pause('conflict', 'Pet paused: browser storage changed in another tab. Download this tab’s progress before reloading.');
+      }
+    });
     this.startLoop();
   }
 
-  processOfflineTime() {
-    const now = Date.now();
-    const lastTimestamp = this.state.data.lastTimestamp || now;
-    const elapsedSec = Math.max(0, (now - lastTimestamp) / 1000);
-    const elapsedHours = elapsedSec / 3600;
-
-    if (elapsedHours > 0.001) {
-      const pet = this.state.data.pet;
-
-      // 1. Hunger decay: 4% per hour
-      const hungerLoss = elapsedHours * (CONFIG.HUNGER_DECAY_PER_HOUR * 100);
-      pet.hunger = Math.max(0, pet.hunger - hungerLoss);
-
-      // 2. Health decay: 1% per hour
-      const hpLoss = elapsedHours * (CONFIG.HEALTH_DECAY_PER_HOUR * pet.maxHp);
-      pet.hp = Math.max(1, pet.hp - hpLoss); // Keep at least 1 HP
-
-      // 3. Track well-fed duration
-      if (pet.hunger >= CONFIG.WELL_FED_HUNGER_THRESHOLD && pet.hp >= pet.maxHp) {
-        pet.wellFedDurationSec += elapsedSec;
-      } else {
-        pet.wellFedDurationSec = 0;
-      }
-
-      // 4. Age food inventory
-      Object.keys(this.state.data.inventory).forEach(cropId => {
-        const item = this.state.data.inventory[cropId];
-        if (item && item.count > 0) {
-          item.ageHours = (item.ageHours || 0) + elapsedHours;
-        }
-      });
-
-      // Automated offline raid checks if away for more than 15 mins
-      if (elapsedHours >= 0.25) {
-        const offlineRaidResult = this.combatEngine.triggerRaid();
-        this.state.data.logs.unshift({
-          timestamp: new Date().toLocaleTimeString(),
-          text: `💤 Welcome back! While away (${elapsedHours.toFixed(1)} hrs), your pet faced an automated raid encounter!`,
-          type: offlineRaidResult.type
-        });
-      }
-
-      // Log offline decay summary if away for more than 5 minutes
-      if (elapsedHours >= 0.08) {
-        this.state.data.logs.unshift({
-          timestamp: new Date().toLocaleTimeString(),
-          text: `💤 Summary: Hunger reduced by ${hungerLoss.toFixed(1)}% and HP decreased by ${hpLoss.toFixed(1)}.`,
-          type: 'win'
-        });
-      }
+  openSession() {
+    const generation = ++this.sessionGeneration;
+    this.releaseWriter?.();
+    this.releaseWriter = null;
+    this.writerLease = false;
+    this.state.canPlay = false;
+    if (!navigator.locks?.request) {
+      this.state.load();
+      this.state.pause('writer-blocked', 'This browser cannot protect saved pets between tabs. Your pet is read-only. Download it or reopen this game in a browser supporting Web Locks on localhost or HTTPS.');
+      return;
     }
+    navigator.locks.request(`${this.state.key}:writer`, { mode: 'exclusive', ifAvailable: true }, async lock => {
+      if (generation !== this.sessionGeneration) return;
+      if (!lock) {
+        this.state.load();
+        this.state.pause('writer-blocked', 'Another game tab owns this pet’s save session. Close it and reload here. You can still download the stored pet.');
+        return;
+      }
+      this.writerLease = true;
+      if (this.state.load()) this.processOfflineTime();
+      await new Promise(resolve => { this.releaseWriter = resolve; });
+    }).catch(() => {
+      if (generation !== this.sessionGeneration) return;
+      this.writerLease = false;
+      this.state.pause('writer-blocked', 'The browser could not establish an exclusive save session. Reload after closing other game tabs. Your stored pet has not been replaced.');
+    });
+  }
 
-    this.state.data.lastTimestamp = now;
-    this.state.save();
+  advance(active) {
+    const result = this.progression.advanceTo(Date.now(), active,
+      () => this.combatEngine.triggerRaid({ persist: false }));
+    this.ui.renderClockStatus(result.clockBackwards);
     this.ui.renderHUD();
+    this.ui.refreshOpenFarm();
+    return result;
+  }
+
+  processOfflineTime() {
+    if (!this.state.canPlay) { this.ui.renderHUD(); return; }
+    const result = this.advance(false);
+    if (result.seconds >= 300) {
+      this.progression.log(`Welcome back! ${ (result.seconds / 3600).toFixed(1) } hours away: food aged and crops grew. Raids waited for you; earned care and levels were kept.`);
+    }
+    this.state.notify();
   }
 
   startLoop() {
-    const loop = () => {
-      const now = Date.now();
-      const deltaSec = (now - this.lastTick) / 1000;
-      this.lastTick = now;
-
-      // Realtime decay & updates (every second)
-      this.tickRealtime(deltaSec);
-
-      // Update farm growth
-      this.farmingMgr.updatePlots();
-
-      // Render graphics canvas
+    const loop = frame => {
+      if (frame - this.lastUpdateFrame >= 250) {
+        this.lastUpdateFrame = frame;
+        this.advance(!document.hidden);
+      }
+      if (this.state.canPlay && frame - this.lastSaveFrame >= 5000) {
+        this.lastSaveFrame = frame;
+        this.state.save();
+      }
       this.renderer.render();
-
       requestAnimationFrame(loop);
     };
-
     requestAnimationFrame(loop);
-  }
-
-  tickRealtime(deltaSec) {
-    const pet = this.state.data.pet;
-    const deltaHours = deltaSec / 3600;
-
-    // Decay rates
-    const hungerLoss = deltaHours * (CONFIG.HUNGER_DECAY_PER_HOUR * 100);
-    pet.hunger = Math.max(0, pet.hunger - hungerLoss);
-
-    const hpLoss = deltaHours * (CONFIG.HEALTH_DECAY_PER_HOUR * pet.maxHp);
-    pet.hp = Math.max(1, pet.hp - hpLoss);
-
-    // Track well-fed duration
-    if (pet.hunger >= CONFIG.WELL_FED_HUNGER_THRESHOLD && pet.hp >= pet.maxHp) {
-      pet.wellFedDurationSec += deltaSec;
-    } else {
-      pet.wellFedDurationSec = 0;
-    }
-
-    // Automatic Raid Event Timer
-    this.raidTimerSec += deltaSec;
-    if (this.raidTimerSec >= this.RAID_INTERVAL_SEC) {
-      this.raidTimerSec = 0;
-      this.combatEngine.triggerRaid();
-    }
-
-    // Save timestamp periodically
-    this.state.data.lastTimestamp = Date.now();
-
-    // Trigger state notification for UI updates every frame
-    this.ui.renderHUD();
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  window.app = new App();
-});
+if (typeof window !== 'undefined') window.addEventListener('DOMContentLoaded', () => { window.app = new App(); });
+if (typeof module !== 'undefined') module.exports = App;
