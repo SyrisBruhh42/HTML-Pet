@@ -317,8 +317,21 @@ class UIManager {
   }
 
   renderFarmPlots() {
+    const renderedData = this.state.data;
+    const samePet = this.farmRenderedData === renderedData;
+    const active = document.activeElement;
+    const focused = samePet && this.plotsContainer.contains(active)
+      ? { plot: active.dataset.plot, control: active.dataset.farmControl } : null;
+    const choices = new Map();
+    if (samePet) {
+      this.plotsContainer.querySelectorAll('.seed-select').forEach(select => {
+        if (Object.hasOwn(CONFIG.CROPS, select.value)) choices.set(select.dataset.plot, select.value);
+      });
+    }
+    this.farmRenderedData = renderedData;
     this.plotsContainer.innerHTML = '';
-    const plots = this.state.data.farmPlots;
+    const plots = renderedData.farmPlots;
+    const disabled = this.state.canPlay ? '' : 'disabled';
     this.farmSignature = plots.map(plot => `${plot.id}:${plot.state}`).join('|');
 
     plots.forEach(plot => {
@@ -332,24 +345,24 @@ class UIManager {
         statusMsg = 'Empty';
         // Options to plant seed
         actionBtn = `
-          <select class="seed-select" data-plot="${plot.id}">
+          <select class="seed-select" data-plot="${plot.id}" data-farm-control="seed" data-game-action aria-label="Seed for plot ${plot.id + 1}" ${disabled}>
             <option value="">Select Seed</option>
             <option value="berry">Berry (5g - 30s)</option>
             <option value="root">Carrot (15g - 2m)</option>
             <option value="crystal">Mana (50g - 5m)</option>
           </select>
-          <button class="pixel-btn success plant-btn" data-plot="${plot.id}">Plant</button>
+          <button class="pixel-btn success plant-btn" data-plot="${plot.id}" data-farm-control="plant" data-game-action aria-label="Plant in plot ${plot.id + 1}" ${disabled}>Plant</button>
         `;
       } else if (plot.state === 'planted') {
         const crop = CONFIG.CROPS[plot.cropId];
         const elapsed = plot.growthSec;
         const remaining = Math.max(0, Math.ceil(crop.growTimeSec - elapsed));
         statusMsg = `Growing ${crop.icon} ${crop.name}<br><span class="plot-countdown" data-plot="${plot.id}">(${remaining}s left)</span>`;
-        actionBtn = `<button class="pixel-btn" disabled>Growing...</button>`;
+        actionBtn = `<button class="pixel-btn" aria-label="Growing ${crop.name} in plot ${plot.id + 1}" disabled>Growing...</button>`;
       } else if (plot.state === 'ready') {
         const crop = CONFIG.CROPS[plot.cropId];
         statusMsg = `Ready to Harvest! ${crop.icon} ${crop.name}`;
-        actionBtn = `<button class="pixel-btn success harvest-btn" data-plot="${plot.id}">Harvest ${crop.icon}</button>`;
+        actionBtn = `<button class="pixel-btn success harvest-btn" data-plot="${plot.id}" data-farm-control="harvest" data-game-action aria-label="Harvest ${crop.name} from plot ${plot.id + 1}" ${disabled}>Harvest ${crop.icon}</button>`;
       }
 
       card.innerHTML = `
@@ -361,13 +374,28 @@ class UIManager {
       this.plotsContainer.appendChild(card);
     });
 
+    // A different crop maturing must not erase a pending choice or keyboard focus.
+    this.plotsContainer.querySelectorAll('.seed-select').forEach(select => {
+      if (choices.has(select.dataset.plot)) select.value = choices.get(select.dataset.plot);
+    });
+    if (focused?.control) {
+      const controls = [...this.plotsContainer.querySelectorAll('[data-farm-control]')]
+        .filter(control => control.dataset.plot === focused.plot && !control.disabled);
+      const target = controls.find(control => control.dataset.farmControl === focused.control)
+        || controls[0] || document.querySelector('#farm-modal .close-btn');
+      target?.focus();
+    }
+
     // Event listeners for plant/harvest
     this.plotsContainer.querySelectorAll('.plant-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        if (!this.allowAction()) return;
-        const plotId = parseInt(e.target.getAttribute('data-plot'));
+        if (renderedData !== this.state.data) return;
+        const plotId = parseInt(e.currentTarget.getAttribute('data-plot'));
         const select = this.plotsContainer.querySelector(`select[data-plot="${plotId}"]`);
         const cropId = select.value;
+        // Advancing time may rebuild the farm. Keep this click's choice, but
+        // never apply an old pet's action after recovery replaces its data.
+        if (!this.allowAction() || renderedData !== this.state.data) return;
         if (cropId) {
           const res = this.farmingMgr.plantSeed(plotId, cropId);
           if (res && !res.success) {
@@ -381,8 +409,8 @@ class UIManager {
 
     this.plotsContainer.querySelectorAll('.harvest-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        if (!this.allowAction()) return;
-        const plotId = parseInt(e.target.getAttribute('data-plot'));
+        if (renderedData !== this.state.data || !this.allowAction() || renderedData !== this.state.data) return;
+        const plotId = parseInt(e.currentTarget.getAttribute('data-plot'));
         this.farmingMgr.harvestPlot(plotId);
         this.renderFarmPlots();
       });
