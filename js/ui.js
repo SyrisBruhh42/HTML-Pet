@@ -76,6 +76,11 @@ class UIManager {
     document.getElementById('confirm-yes-btn').addEventListener('click', () => {
       if (!this.confirmDialog.open || !this.pendingFeedCropId) return;
       const cropId = this.pendingFeedCropId;
+      if (this.pendingFeedData !== this.state.data) {
+        this.finishFeedReview(cropId);
+        document.getElementById('feeding-status').textContent = 'Your pet changed during this review. No food was spent; choose food again for the current pet.';
+        return;
+      }
       this.pendingFeedCropId = null; // A second activation cannot feed twice.
       this.executeFeed(cropId);
       this.finishFeedReview(cropId);
@@ -271,6 +276,7 @@ class UIManager {
   handleFeedClick(cropId, config, currentQuality) {
     if (this.confirmDialog.open || this.pendingFeedCropId) return;
     if (this.state.data.settings.confirmFeed) {
+      if (!this.allowAction()) return;
       const status = document.getElementById('feeding-status');
       if (typeof this.confirmDialog.showModal !== 'function') {
         status.textContent = 'Feeding confirmation needs HTML dialog support. Your food was kept.';
@@ -278,6 +284,8 @@ class UIManager {
         return;
       }
       this.pendingFeedCropId = cropId;
+      this.pendingFeedData = this.state.data;
+      currentQuality = Math.floor(this.progression.foodQuality(cropId));
       this.confirmMsg.textContent = `Feed 1 ${config.name} to your slime? Quality now: ${currentQuality}. Food continues to age until fed.`;
       try {
         this.confirmDialog.showModal();
@@ -285,6 +293,7 @@ class UIManager {
         status.textContent = '';
       } catch {
         this.pendingFeedCropId = null;
+        this.pendingFeedData = null;
         status.textContent = 'The feeding dialog could not open. Your food was kept. Close other dialogs and try again.';
         status.focus();
       }
@@ -295,7 +304,8 @@ class UIManager {
 
   finishFeedReview(cropId = this.pendingFeedCropId) {
     this.pendingFeedCropId = null;
-    if (this.confirmDialog.open) this.confirmDialog.close();
+    this.pendingFeedData = null;
+    if (this.confirmDialog?.open) this.confirmDialog.close();
     if (!cropId) return;
     this.focusFood(cropId);
   }
@@ -452,6 +462,9 @@ class UIManager {
   }
 
   restoreBackup(raw, options) {
+    // A delayed file read may finish after a feeding review has opened.
+    // Recovery supersedes that review; its approval must never target a new pet.
+    this.finishFeedReview();
     return this.recoveryDialog.review(raw, options);
   }
 

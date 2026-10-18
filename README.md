@@ -37,7 +37,7 @@ The current engineering tuning combines care with persistent growth:
 
 These are developer-selected tuning defaults for the care-and-progression direction. They are documented here so later balance changes are deliberate and testable.
 
-The Inventory's **Require Confirmation on Feed** preference is saved with the pet. When enabled, a labelled native dialog starts on Cancel; Escape cancels only the feeding review, and Feed Pet consumes one item. Focus returns to that food's current button, or Inventory's Close button when no food remains. Browsers without native dialog support refuse confirmed feeding visibly and keep the food. Time continues normally while reviewing, so its displayed quality is a snapshot of when the review opened.
+The Inventory's **Require Confirmation on Feed** preference is saved with the pet. When enabled, a labelled native dialog starts on Cancel; Escape cancels only the feeding review, and Feed Pet consumes one item. Focus returns to that food's current button, or Inventory's Close button when no food remains. Browsers without native dialog support refuse confirmed feeding visibly and keep the food. Time continues normally while reviewing, so its displayed quality is a snapshot of when the review opened. Opening recovery cancels a pending feeding review, and restoring or reloading the pet invalidates an older feeding approval.
 
 The game follows the system's reduced-motion preference, including changes while it is open: the slime stays still, feeding particles and bounce stop, and menu/bar transitions are removed. Farming, care, growth, saving and encounters keep their usual timing.
 

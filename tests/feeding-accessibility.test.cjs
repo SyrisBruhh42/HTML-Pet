@@ -126,3 +126,29 @@ test('unavailable native dialog and a second review never silently feed or repla
     assert.match(f.doc.getElementById('feeding-status').textContent, /dialog/i);
   } finally { f.cleanup(); }
 });
+
+test('review quality is calculated after elapsed time rather than from an old inventory card', () => {
+  const f = fixture();
+  try {
+    f.state.data.settings.confirmFeed = true;
+    f.ui.beforeAction = () => { f.state.data.inventory.berry.batches[0].ageHours = 24; f.ui.renderHUD(); };
+    f.ui.handleFeedClick('berry', CONFIG.CROPS.berry, 15);
+    assert.match(f.ui.confirmMsg.textContent, /Quality now: 7\./);
+  } finally { f.cleanup(); }
+});
+
+test('a pending feeding cannot spend food after the pet is restored or reloaded', () => {
+  for (const transition of ['replace', 'load']) {
+    const f = fixture();
+    try {
+      f.state.data.settings.confirmFeed = true; f.state.save();
+      f.ui.handleFeedClick('berry', CONFIG.CROPS.berry, 15);
+      if (transition === 'replace') assert.equal(f.state.replace(JSON.stringify(GameState.fresh(1792350000000))), true);
+      else assert.equal(f.state.load(), true);
+      const before = JSON.stringify(f.state.data);
+      f.doc.getElementById('confirm-yes-btn').dispatch('click');
+      assert.equal(JSON.stringify(f.state.data), before); assert.equal(f.ui.confirmDialog.open, false);
+      assert.match(f.doc.getElementById('feeding-status').textContent, /changed/);
+    } finally { f.cleanup(); }
+  }
+});
