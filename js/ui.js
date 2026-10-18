@@ -94,13 +94,6 @@ class UIManager {
       this.finishFeedReview();
     });
 
-    // Trigger Raid Test Button
-    document.getElementById('trigger-raid-btn').addEventListener('click', () => {
-      if (!this.allowAction()) return;
-      this.combatEngine.triggerRaid();
-      this.renderLog();
-    });
-
     const shopAction = action => {
       const previousFocus = document.activeElement;
       if (!this.allowAction()) return;

@@ -1,7 +1,7 @@
 const CONFIG = {
   // Rates & Mechanics
   HEALTH_DECAY_PER_HOUR: 0.01, // 1% per hour
-  HUNGER_DECAY_PER_HOUR: 0.04, // 4% per hour
+  HUNGER_DECAY_PER_HOUR: 0.01, // 1% per hour
   WELL_FED_HUNGER_THRESHOLD: 90, // % hunger to be considered well-fed
   WELL_FED_HEALTH_RATIO: 0.9,
   HEALTH_INCREASE_REQ_HOURS: 24, // Banked eligible care; pauses when hungry or hurt.
@@ -12,6 +12,7 @@ const CONFIG = {
   // Growth
   SIZE_INCREASE_PER_LEVEL: 0.01, // 1% per level up
   MAX_HEALTH_INCREASE_PER_LEVEL: 0.10, // 10% per level up
+  QUALITY_REQUIREMENT_INCREASE_PER_LEVEL: 0.10, // Independent of care-earned health.
 
   // Base Pet Stats
   BASE_HP: 100,
@@ -25,7 +26,7 @@ const CONFIG = {
   },
 
   // Food Aging
-  FOOD_AGE_DECAY_HOURS: 48, // hours after which food quality degrades to min quality
+  FOOD_AGE_DECAY_HOURS: 48, // Linear decay scale; the 50% floor is reached after 24 hours.
   MIN_FOOD_QUALITY_RATIO: 0.5,
 
   // Default Items / Crops

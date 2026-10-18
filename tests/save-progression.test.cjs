@@ -4,6 +4,7 @@ const GameState = require('../js/state.js');
 const Progression = require('../js/progression.js');
 global.CONFIG = require('../js/config.js');
 const FarmingManager = require('../js/farming.js');
+const Upgrades = require('../js/upgrades.js');
 const { EncounterEngine, DiceEngine } = require('../js/combat.js');
 const App = require('../js/app.js');
 const UIManager = require('../js/ui.js');
@@ -139,10 +140,12 @@ test('fresh games do not share mutable arrays or pet objects', () => {
 test('care credits exactly the eligible part of an interval and pauses rather than resets', () => {
   const { state, progression } = fresh();
   progression.advanceTo(EPOCH + 5 * 3600000);
-  near(state.data.pet.wellFedDurationSec, 2.5 * 3600);
-  near(state.data.pet.hunger, 80); near(state.data.pet.hp, 95);
-  progression.advanceTo(EPOCH + 6 * 3600000);
-  near(state.data.pet.wellFedDurationSec, 2.5 * 3600);
+  near(state.data.pet.wellFedDurationSec, 5 * 3600);
+  near(state.data.pet.hunger, 95); near(state.data.pet.hp, 95);
+  progression.advanceTo(EPOCH + 12 * 3600000);
+  near(state.data.pet.wellFedDurationSec, 10 * 3600);
+  progression.advanceTo(EPOCH + 13 * 3600000);
+  near(state.data.pet.wellFedDurationSec, 10 * 3600);
 });
 
 test('a reachable repeated care sequence earns one permanent benefit, consumes credit and survives restart', () => {
@@ -155,8 +158,7 @@ test('a reachable repeated care sequence earns one permanent benefit, consumes c
     now += 2 * 3600000; progression.advanceTo(now);
     assert.equal(farm.harvestPlot(0).success, true);
     if (state.data.pet.hp < state.data.pet.maxHp * .92) {
-      state.data.gold -= 30;
-      state.data.pet.hp = Math.min(state.data.pet.maxHp, state.data.pet.hp + 30);
+      assert.equal(new Upgrades(state).buyHealKit().success, true);
     }
     progression.feed('berry');
   }

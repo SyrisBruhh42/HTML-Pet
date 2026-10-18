@@ -30,7 +30,8 @@ class Upgrades {
     const data = this.state.data, pet = data.pet;
     if (pet.hp >= pet.maxHp) return this.refuse('Your pet is already healthy. Your gold was kept.');
     if (data.gold < 30) return this.refuse('A healing kit costs 30 gold.');
-    const next = Math.min(pet.maxHp, pet.hp + 30);
+    const quantity = Math.max(30, Math.ceil(pet.maxHp * .30));
+    const next = Math.min(pet.maxHp, pet.hp + quantity);
     if (!Number.isFinite(next) || next <= pet.hp) return this.refuse('Healing cannot be recorded safely. Your gold was kept.');
     const healed = next - pet.hp;
     data.gold -= 30; pet.hp = next;

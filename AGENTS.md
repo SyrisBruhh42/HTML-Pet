@@ -13,7 +13,7 @@ Office is an optional private coordination resource. If access is unavailable, u
 
 ## Progression and saved-state boundaries
 
-Preserve the pending owner decision on reward and real-time/offline balance before expanding these systems. Do not invent a cap, reward formula or accepted save behavior from historical notes. Continue independent authorized documentation or investigation while the decision remains pending.
+The product direction combines caring for a pet with meaningful progression. Numeric balance defaults are delegated to the lead developer and recorded in README.md with regression evidence. Preserve earned progress and recovery; do not infer new product scope or accepted save behavior from historical notes.
 
 For changes that affect these areas, establish evidence for the agreed reward sequence, restart persistence, visible invalid-save recovery and the agreed offline rule. Source inspection, a page loading successfully, or passing unrelated checks does not establish those outcomes.
 
@@ -31,5 +31,5 @@ Project role: Independent browser pixel-slime pet experiment.
 - Continue authorized work through proportionate verification. Ask only for genuinely missing decisions or authority, explaining why. Delegate bounded independent work with distinct ownership and one integrator.
 - Report outcomes plainly, with material evidence and limitations. Separate drafted, tested, merged, deployed and runtime-accepted states; retain failed and unrun checks. Give concise public rationale, not private reasoning transcripts. Do not claim assurance from prompt wording alone.
 
-Local scope: Keep this browser pet separate from native PC-Pet and LFS companion work. Preserve pending reward/offline-balance decisions rather than inventing accepted behavior.
+Local scope: Keep this browser pet separate from native PC-Pet and LFS companion work. Follow the recorded care-and-progression balance defaults, preserving existing saves and qualifying deliberate future changes.
 <!-- lfs-portfolio-policy:end -->
