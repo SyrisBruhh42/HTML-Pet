@@ -370,10 +370,11 @@ test('currency and time counters refuse overflow without lossy clamps', () => {
 
 test('a late writer grant after pagehide cannot load or save, and the restored page can acquire', async () => {
   const requests = [];
-  global.navigator = { locks: { request(name, options, callback) {
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(global, 'navigator');
+  Object.defineProperty(global, 'navigator', { configurable: true, value: { locks: { request(name, options, callback) {
     let resolve, reject; const promise = new Promise((yes, no) => {resolve = yes; reject = no;});
     requests.push({ callback, resolve, reject }); return promise;
-  } } };
+  } } } });
   const { state, storage } = fresh();
   const app = { state, sessionGeneration: 0, writerLease: false, processOfflineTime() { state.save(); } };
   state.writerCheck = () => app.writerLease;
@@ -391,5 +392,8 @@ test('a late writer grant after pagehide cannot load or save, and the restored p
     app.sessionGeneration += 1; app.writerLease = false; state.canPlay = false;
     app.releaseWriter(); await held; requests[1].resolve();
     assert.equal(app.writerLease, false);
-  } finally { delete global.navigator; }
+  } finally {
+    if (navigatorDescriptor) Object.defineProperty(global, 'navigator', navigatorDescriptor);
+    else delete global.navigator;
+  }
 });

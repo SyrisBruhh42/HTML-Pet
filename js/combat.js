@@ -25,7 +25,9 @@ class EncounterEngine {
     const d20 = DiceEngine.roll(1, 20);
     const statModifier = Math.floor(pet.level / 2);
     const baseDefense = 10;
-    const totalDefense = d20.total + statModifier + baseDefense;
+    const gear = this.state.data.equipmentLoadout;
+    const equipmentDefense = gear?.owned.includes(gear.equipped) ? CONFIG.EQUIPMENT[gear.equipped]?.defense || 0 : 0;
+    const totalDefense = d20.total + statModifier + baseDefense + equipmentDefense;
 
     // Threat level DC scaled with pet level
     const threatLevel = Math.floor(Math.random() * 5) + pet.level;
@@ -52,7 +54,7 @@ class EncounterEngine {
         return null;
       }
       this.state.data.gold += rewardGold;
-      resultMsg = `⚔️ VICTORY! Defense check ${totalDefense} (Roll ${d20.total} + ${statModifier}) vs DC ${encounterDC}. Pet repelled the raid and earned ${rewardGold} gold!`;
+      resultMsg = `⚔️ VICTORY! Defense check ${totalDefense} (roll ${d20.total} + level ${statModifier} + base ${baseDefense} + equipment ${equipmentDefense}) vs DC ${encounterDC}. Pet repelled the raid and earned ${rewardGold} gold!`;
       type = 'win';
     } else if (d20.total === 1) {
       // Critical Fail
@@ -80,7 +82,7 @@ class EncounterEngine {
     }
 
     if (persist) this.state.notify();
-    return { d20: d20.total, totalDefense, encounterDC, resultMsg, type };
+    return { d20: d20.total, totalDefense, equipmentDefense, encounterDC, resultMsg, type };
   }
 }
 

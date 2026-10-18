@@ -37,6 +37,14 @@ The current engineering tuning combines care with persistent growth:
 
 These are developer-selected tuning defaults for the care-and-progression direction. They are documented here so later balance changes are deliberate and testable.
 
+## Equipment and garden purchases
+
+The shop now offers permanent equipment ownership and one equipped defense item. Purchase and equip are separate actions; removing equipment keeps it owned. Current developer-selected tuning is Leaf Shield at level 1 for 60 gold (+1 defense), Shell Shield at level 3 for 180 gold (+2), and Crystal Shield at level 5 for 420 gold (+4). The active item appears beside the pet and in its accessible description. Its bonus affects ordinary defense checks; natural 1 remains a critical failure, natural 20 remains a critical win, and care/level/offline rules are unchanged.
+
+Every purchased plot has a separate garden position and full Farming controls. The camera fits the expanded garden into the screen; the Farming list remains usable when a large garden is visually small. Plots cost 100 gold. A 30-gold healing kit restores up to 30 HP and is unavailable at full health, so a healthy pet cannot accidentally spend gold on it. Failed, locked or duplicate purchases retain gold; save failures preserve in-memory progress under the existing recovery flow.
+
+Equipment uses the optional `equipmentLoadout` record (version 1) inside version-2 saves. Older saves with no record remain valid and start without equipment; unrelated historical extension fields remain intact. Invalid, duplicate, unowned or unsupported equipment records pause loading and preserve the original bytes. No migration or reseeding of existing food, care, gold or plots is required.
+
 ## Save and recovery
 
 The game uses version 2 saves at the existing `pixel_pet_save_v1` browser key. Valid old saves migrate without reseeding inventory or clearing progress. A byte-exact copy of the old save must be written and read back before migration can replace it. Additional fields, including future equipment records, are carried through migration.
@@ -50,14 +58,14 @@ The game holds an exclusive Web Locks save session for its lifetime. A second ga
 Run the dependency-free domain/storage regressions with Node 18 or newer:
 
 ```sh
-node tests/save-progression.test.cjs
+node --test tests/*.test.cjs
 ```
 
 The suite covers legacy migration and exact recovery bytes, corrupt/future saves through startup, denied reads and quota failures, import, competing writers, reachable care rewards with restart persistence, level overflow, fresh harvest batches, live/away time, rollback and text-only event logs. These are synthetic checks, not browser acceptance.
 
 For manual browser verification, serve the directory and open `tests/browser-fixtures.html`. Its explicit buttons launch the real page in an embedded frame with isolated fixture storage for legacy, corrupt, unsupported-version, denied-read, quota-failure and backward-clock cases. Fault injection is confined to this test page; it is not part of the application entry point. Normal play should also be checked separately: feed by keyboard, plant, wait for maturity with Farming open, harvest, reload and confirm progress.
 
-The October 18 implementation is a local candidate. Browser and test results belong to the accompanying implementation receipt; a document or passing domain test does not establish merge, deployment or full product acceptance. Equipment, broader economy/raid balance, rendering every purchased plot and full accessibility/mobile qualification remain part of the broader product scope.
+The October 18 implementation is a local candidate. Browser and test results belong to the accompanying implementation receipt; a document or passing domain test does not establish merge, deployment or full product acceptance. Full economy/raid balance, native backup restoration, complete accessibility/mobile qualification and release acceptance remain part of the broader product scope.
 
 ## Start a task
 
