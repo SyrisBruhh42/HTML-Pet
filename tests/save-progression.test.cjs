@@ -243,14 +243,16 @@ test('raid phase and fractional elapsed remainder survive saving and restart', (
 test('raids preserve positive life and invalid-save pause blocks farming and combat mutations', () => {
   const { state, farm } = fresh(); const engine = new EncounterEngine(state);
   const roll = DiceEngine.roll;
+  const random = Math.random;
   try {
+    Math.random = () => 0; // A natural 1 must fail even against the easiest threat.
     DiceEngine.roll = () => ({ total: 1, rolls: [1] }); state.data.pet.hp = 3;
     engine.triggerRaid(); assert.equal(state.data.pet.hp, 1);
     engine.triggerRaid(); assert.equal(state.data.pet.hp, 1);
     state.canPlay = false; const before = JSON.stringify(state.data);
     assert.equal(farm.plantSeed(0, 'berry'), false); assert.equal(engine.triggerRaid(), null);
     assert.equal(JSON.stringify(state.data), before);
-  } finally { DiceEngine.roll = roll; }
+  } finally { DiceEngine.roll = roll; Math.random = random; }
 });
 
 test('saved log payloads are rendered as text, not markup', () => {

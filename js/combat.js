@@ -44,7 +44,7 @@ class EncounterEngine {
       this.state.data.gold += rewardGold;
       resultMsg = `🌟 CRITICAL VICTORY! Nat 20 roll! Defense check ${totalDefense} vs DC ${encounterDC}. Pet defended perfectly and gained ${rewardGold} gold!`;
       type = 'crit-win';
-    } else if (totalDefense >= encounterDC) {
+    } else if (d20.total !== 1 && totalDefense >= encounterDC) {
       // Standard Success
       const rewardGold = 10 * pet.level;
       if (this.state.data.gold > Number.MAX_SAFE_INTEGER - rewardGold || !Number.isSafeInteger(rewardGold)) {
