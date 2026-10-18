@@ -64,23 +64,34 @@ class UIManager {
 
     // Toggle confirm checkbox
     this.toggleConfirm.addEventListener('change', (e) => {
+      // Advancing elapsed time refreshes the HUD, including this checkbox.
+      const requested = e.target.checked;
       if (!this.allowAction()) { this.renderHUD(); return; }
-      this.state.data.settings.confirmFeed = e.target.checked;
+      this.state.data.settings.confirmFeed = requested;
       this.state.save();
+      this.renderHUD();
     });
 
     // Confirm Feed Buttons
     document.getElementById('confirm-yes-btn').addEventListener('click', () => {
-      if (this.pendingFeedCropId) {
-        this.executeFeed(this.pendingFeedCropId);
-        this.pendingFeedCropId = null;
+      if (!this.confirmDialog.open || !this.pendingFeedCropId) return;
+      const cropId = this.pendingFeedCropId;
+      if (this.pendingFeedData !== this.state.data) {
+        this.finishFeedReview(cropId);
+        document.getElementById('feeding-status').textContent = 'Your pet changed during this review. No food was spent; choose food again for the current pet.';
+        return;
       }
-      this.confirmDialog.classList.add('hidden');
+      this.pendingFeedCropId = null; // A second activation cannot feed twice.
+      this.executeFeed(cropId);
+      this.finishFeedReview(cropId);
     });
 
     document.getElementById('confirm-no-btn').addEventListener('click', () => {
-      this.pendingFeedCropId = null;
-      this.confirmDialog.classList.add('hidden');
+      this.finishFeedReview();
+    });
+    this.confirmDialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      this.finishFeedReview();
     });
 
     // Trigger Raid Test Button
@@ -110,7 +121,7 @@ class UIManager {
       if (!document.getElementById('upgrades-modal').classList.contains('hidden')) this.renderUpgrades();
     });
     document.addEventListener('keydown', event => {
-      if (this.recoveryDialog?.isOpen()) return;
+      if (this.recoveryDialog?.isOpen() || this.confirmDialog.open) return;
       if (this.modalOverlay.classList.contains('hidden')) return;
       if (event.key === 'Escape') this.closeModals();
       if (event.key !== 'Tab') return;
@@ -140,10 +151,9 @@ class UIManager {
   }
 
   closeModals() {
+    this.finishFeedReview();
     this.modalOverlay.classList.add('hidden');
     document.querySelectorAll('.folder-modal').forEach(m => m.classList.add('hidden'));
-    this.confirmDialog.classList.add('hidden');
-    this.pendingFeedCropId = null;
     this.lastFocus?.focus();
   }
 
@@ -223,6 +233,7 @@ class UIManager {
   }
 
   renderInventory() {
+    const focusedCrop = document.activeElement?.dataset.cropId;
     this.inventoryGrid.innerHTML = '';
     const inventory = this.state.data.inventory;
 
@@ -233,6 +244,7 @@ class UIManager {
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'item-card';
+      card.dataset.cropId = cropId;
       card.disabled = !this.state.canPlay || item.count <= 0;
       if (item.count <= 0) card.style.opacity = '0.5';
 
@@ -258,16 +270,50 @@ class UIManager {
 
       this.inventoryGrid.appendChild(card);
     });
+    if (focusedCrop) this.focusFood(focusedCrop);
   }
 
   handleFeedClick(cropId, config, currentQuality) {
+    if (this.confirmDialog.open || this.pendingFeedCropId) return;
     if (this.state.data.settings.confirmFeed) {
+      if (!this.allowAction()) return;
+      const status = document.getElementById('feeding-status');
+      if (typeof this.confirmDialog.showModal !== 'function') {
+        status.textContent = 'Feeding confirmation needs HTML dialog support. Your food was kept.';
+        status.focus();
+        return;
+      }
       this.pendingFeedCropId = cropId;
-      this.confirmMsg.textContent = `Feed 1 ${config.name} (Quality: ${currentQuality}) to your slime?`;
-      this.confirmDialog.classList.remove('hidden');
+      this.pendingFeedData = this.state.data;
+      currentQuality = Math.floor(this.progression.foodQuality(cropId));
+      this.confirmMsg.textContent = `Feed 1 ${config.name} to your slime? Quality now: ${currentQuality}. Food continues to age until fed.`;
+      try {
+        this.confirmDialog.showModal();
+        document.getElementById('confirm-no-btn').focus();
+        status.textContent = '';
+      } catch {
+        this.pendingFeedCropId = null;
+        this.pendingFeedData = null;
+        status.textContent = 'The feeding dialog could not open. Your food was kept. Close other dialogs and try again.';
+        status.focus();
+      }
     } else {
       this.executeFeed(cropId);
     }
+  }
+
+  finishFeedReview(cropId = this.pendingFeedCropId) {
+    this.pendingFeedCropId = null;
+    this.pendingFeedData = null;
+    if (this.confirmDialog?.open) this.confirmDialog.close();
+    if (!cropId) return;
+    this.focusFood(cropId);
+  }
+
+  focusFood(cropId) {
+    const food = this.inventoryGrid.querySelector(`[data-crop-id="${cropId}"]`);
+    const target = food && !food.disabled ? food : document.getElementById('feed-modal').querySelector('.close-btn');
+    target?.focus();
   }
 
   executeFeed(cropId) {
@@ -416,6 +462,9 @@ class UIManager {
   }
 
   restoreBackup(raw, options) {
+    // A delayed file read may finish after a feeding review has opened.
+    // Recovery supersedes that review; its approval must never target a new pet.
+    this.finishFeedReview();
     return this.recoveryDialog.review(raw, options);
   }
 

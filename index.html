@@ -90,9 +90,9 @@
     <!-- Modals / Folder Popups -->
     <div id="modal-overlay" class="hidden">
       <!-- Feeding & Inventory Folder Modal -->
-      <div id="feed-modal" class="folder-modal hidden" role="dialog" aria-modal="true">
+      <div id="feed-modal" class="folder-modal hidden" role="dialog" aria-modal="true" aria-labelledby="feed-title">
         <div class="folder-header">
-          <h2>📁 Food & Inventory Folder</h2>
+          <h2 id="feed-title">📁 Food & Inventory Folder</h2>
           <button class="close-btn" aria-label="Close">&times;</button>
         </div>
         <div class="folder-body">
@@ -104,6 +104,7 @@
             </label>
           </div>
           <div class="inventory-section">
+            <p id="feeding-status" role="status" tabindex="-1"></p>
             <h3>Available Supplies</h3>
             <div id="inventory-grid" class="item-grid">
               <!-- Dynamically populated -->
@@ -139,9 +140,9 @@
       </div>
 
       <!-- Farm / Plots Folder Modal -->
-      <div id="farm-modal" class="folder-modal hidden" role="dialog" aria-modal="true">
+      <div id="farm-modal" class="folder-modal hidden" role="dialog" aria-modal="true" aria-labelledby="farm-title">
         <div class="folder-header">
-          <h2>🌱 Farm Plots Folder</h2>
+          <h2 id="farm-title">🌱 Farm Plots Folder</h2>
           <button class="close-btn" aria-label="Close">&times;</button>
         </div>
         <div class="folder-body">
@@ -152,9 +153,9 @@
       </div>
 
       <!-- Combat / Event Log Modal -->
-      <div id="log-modal" class="folder-modal hidden" role="dialog" aria-modal="true">
+      <div id="log-modal" class="folder-modal hidden" role="dialog" aria-modal="true" aria-labelledby="log-title">
         <div class="folder-header">
-          <h2>📜 D&D Encounter Log</h2>
+          <h2 id="log-title">📜 D&D Encounter Log</h2>
           <button class="close-btn" aria-label="Close">&times;</button>
         </div>
         <div class="folder-body">
@@ -167,17 +168,17 @@
         </div>
       </div>
 
-      <!-- Feed Confirmation Dialog Popup -->
-      <div id="confirm-feed-dialog" class="dialog-popup hidden">
-        <h3>Confirm Feed</h3>
-        <p id="confirm-dialog-msg">Are you sure you want to feed this item to your slime?</p>
-        <div class="dialog-actions">
-          <button id="confirm-yes-btn" data-game-action class="pixel-btn success">Feed Pet</button>
-          <button id="confirm-no-btn" class="pixel-btn danger">Cancel</button>
-        </div>
-      </div>
     </div>
   </div>
+
+  <dialog id="confirm-feed-dialog" class="dialog-popup" aria-labelledby="confirm-feed-title" aria-describedby="confirm-dialog-msg">
+    <h2 id="confirm-feed-title">Confirm feeding</h2>
+    <p id="confirm-dialog-msg"></p>
+    <div class="dialog-actions">
+      <button id="confirm-no-btn" type="button" class="pixel-btn" autofocus>Cancel</button>
+      <button id="confirm-yes-btn" type="button" data-game-action class="pixel-btn success">Feed Pet</button>
+    </div>
+  </dialog>
 
   <dialog id="recovery-dialog" aria-labelledby="recovery-title" aria-describedby="recovery-description recovery-summary">
     <h2 id="recovery-title">Review pet recovery</h2>
