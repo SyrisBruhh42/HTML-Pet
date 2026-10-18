@@ -431,3 +431,16 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .equipment-grid { display: grid; gap: 12px; margin: 12px 0; }
 #shop-status:empty { display: none; }
 #shop-status { padding: 8px; border-left: 3px solid #9ae6b4; }
+
+/* Recovery uses a native modal dialog: background controls remain inert. */
+#recovery-dialog { width: min(38rem, calc(100vw - 32px)); max-height: calc(100dvh - 32px);
+  overflow: auto; box-sizing: border-box; color: #edf2f7; background: #1a202c;
+  border: 3px solid #e2e8f0; border-radius: 12px; padding: 20px; font: 16px/1.5 system-ui, sans-serif; }
+#recovery-dialog::backdrop { background: rgba(0, 0, 0, .75); }
+#recovery-dialog h2 { margin-top: 0; }
+#recovery-summary { overflow-wrap: anywhere; font-weight: bold; }
+#recovery-error { border-left: 4px solid #f6ad55; padding: 8px; }
+#recovery-raw { width: 100%; box-sizing: border-box; font: 12px monospace; user-select: text; }
+#recovery-dialog .dialog-actions { flex-wrap: wrap; justify-content: flex-end; }
+#recovery-dialog .pixel-btn { white-space: normal; line-height: 1.4; }
+#recovery-status:focus, #recovery-error:focus, textarea:focus-visible { outline: 3px solid #f6e05e; outline-offset: 3px; }

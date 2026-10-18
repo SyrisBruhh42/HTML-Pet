@@ -397,3 +397,34 @@ test('a late writer grant after pagehide cannot load or save, and the restored p
     else delete global.navigator;
   }
 });
+
+
+test('replacement preserves stored bytes and distinct unsaved progress before writing the imported pet', () => {
+  const { state, storage } = fresh(); state.save(); const stored = storage.getItem(KEY);
+  state.data.gold = 299; state.data.futureKeepsake = { retained: true };
+  const current = JSON.stringify(state.data), writes = [], originalSet = storage.setItem.bind(storage);
+  storage.setItem = (key, raw) => { writes.push([key, raw]); originalSet(key, raw); };
+  const imported = GameState.fresh(EPOCH); imported.gold = 900;
+  assert.equal(state.replace(JSON.stringify(imported)), true);
+  assert.deepEqual(writes.map(([key]) => key === KEY), [false, false, true]);
+  assert.equal(writes[0][1], current); assert.equal(writes[1][1], stored);
+  assert.equal(storage.getItem(writes[0][0]), current); assert.equal(storage.getItem(writes[1][0]), stored);
+  assert.equal(state.data.gold, 900);
+});
+
+test('failure writing or verifying either recovery copy cannot replace stored or unsaved progress', () => {
+  for (const failure of ['write', 'readback']) for (const failCopy of [1, 2]) {
+    const { state, storage } = fresh(); state.save(); const stored = storage.getItem(KEY); state.data.gold = 299;
+    const current = JSON.stringify(state.data), originalSet = storage.setItem.bind(storage); let copies = 0;
+    storage.setItem = (key, raw) => {
+      if (key !== KEY && ++copies === failCopy) {
+        if (failure === 'write') throw new Error('Synthetic recovery failure');
+        originalSet(key, raw + ' '); return; // A non-exact copy cannot authorize replacement.
+      }
+      originalSet(key, raw);
+    };
+    assert.equal(state.replace(JSON.stringify(GameState.fresh(EPOCH))), false);
+    assert.equal(storage.getItem(KEY), stored); assert.equal(JSON.stringify(state.data), current);
+    assert.equal(state.canPlay, false); assert.equal(state.status.kind, 'import-error');
+  }
+});
