@@ -84,7 +84,9 @@ class Renderer {
     ctx.translate(centerX, centerY);
 
     // Relative scaling: As pet level/scale grows, environment shrinks
-    const envScale = 1 / Math.pow(scaleFactor, 0.7);
+    const layout = this.gardenLayout(this.state.data.farmPlots.length);
+    const fit = Math.min(width / (layout.worldSize + 40), height / (layout.worldSize + 40));
+    const envScale = Math.min(1 / Math.pow(scaleFactor, 0.7), fit);
     ctx.scale(envScale, envScale);
 
     this.drawEnvironment(ctx);
@@ -105,11 +107,35 @@ class Renderer {
     ctx.restore();
   }
 
+  static plotPositions(count) {
+    const positions = [{ x: -160, y: -160 }, { x: 80, y: -160 },
+      { x: -160, y: 80 }, { x: 80, y: 80 }].slice(0, count);
+    // Expand square rings around the pet without overlapping the original plots.
+    for (let ring = 2; positions.length < count; ring++) {
+      for (let y = -ring; y <= ring && positions.length < count; y++) {
+        for (let x = -ring; x <= ring && positions.length < count; x++) {
+          if (Math.max(Math.abs(x), Math.abs(y)) === ring)
+            positions.push({ x: x * 120 - 40, y: y * 120 - 40 });
+        }
+      }
+    }
+    return positions;
+  }
+
+  gardenLayout(count) {
+    if (this.layout?.positions.length === count) return this.layout;
+    const positions = Renderer.plotPositions(count);
+    const extent = positions.reduce((max, p) => Math.max(max, Math.abs(p.x), Math.abs(p.y), Math.abs(p.x + 80), Math.abs(p.y + 80)), 0);
+    const tiles = Math.max(18, Math.ceil((extent + 100) * 2 / 64));
+    return this.layout = { positions, tiles, worldSize: tiles * 64 };
+  }
+
   drawEnvironment(ctx) {
     // Ground Grid & Grass Tiles
     const gridSize = 64;
-    const gridCols = 18;
-    const gridRows = 18;
+    const layout = this.gardenLayout(this.state.data.farmPlots.length);
+    const gridCols = layout.tiles;
+    const gridRows = layout.tiles;
     const startX = - (gridCols * gridSize) / 2;
     const startY = - (gridRows * gridSize) / 2;
 
@@ -128,12 +154,7 @@ class Renderer {
     ctx.strokeRect(startX, startY, gridCols * gridSize, gridRows * gridSize);
 
     // Render Farm Plots in World Environment
-    const plotPositions = [
-      { x: -160, y: -160 },
-      { x: 80, y: -160 },
-      { x: -160, y: 80 },
-      { x: 80, y: 80 }
-    ];
+    const plotPositions = layout.positions;
 
     const farmPlots = this.state.data.farmPlots || [];
     farmPlots.forEach((plot, i) => {
@@ -262,6 +283,13 @@ class Renderer {
       ctx.arc(0, h * 0.08, 9, 0, Math.PI, false);
     }
     ctx.stroke();
+
+    const gear = this.state.data.equipmentLoadout;
+    const item = gear?.owned.includes(gear.equipped) ? CONFIG.EQUIPMENT[gear.equipped] : null;
+    if (item) {
+      ctx.font = '30px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(item.icon, w / 2 + 10, h / 4);
+    }
 
     // Crown for Level >= 5
     if (pet.level >= 5) {

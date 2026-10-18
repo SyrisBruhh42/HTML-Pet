@@ -427,3 +427,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 }
 
 #backup-text, #import-text { width: 100%; user-select: text; -webkit-user-select: text; font: 12px monospace; }
+
+.equipment-grid { display: grid; gap: 12px; margin: 12px 0; }
+#shop-status:empty { display: none; }
+#shop-status { padding: 8px; border-left: 3px solid #9ae6b4; }

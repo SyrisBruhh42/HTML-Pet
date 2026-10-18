@@ -17,6 +17,13 @@ const CONFIG = {
   BASE_HP: 100,
   BASE_HUNGER: 100,
 
+  // Deliberate tuning defaults: permanent ownership, one defense item at a time.
+  EQUIPMENT: {
+    leaf: { id: 'leaf', name: 'Leaf Shield', icon: '🍃', cost: 60, level: 1, defense: 1 },
+    shell: { id: 'shell', name: 'Shell Shield', icon: '🐚', cost: 180, level: 3, defense: 2 },
+    crystal: { id: 'crystal', name: 'Crystal Shield', icon: '🛡️', cost: 420, level: 5, defense: 4 }
+  },
+
   // Food Aging
   FOOD_AGE_DECAY_HOURS: 48, // hours after which food quality degrades to min quality
   MIN_FOOD_QUALITY_RATIO: 0.5,

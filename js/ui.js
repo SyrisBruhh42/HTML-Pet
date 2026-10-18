@@ -8,6 +8,7 @@ class UIManager {
     this.combatEngine = combatEngine;
     this.renderer = renderer;
     this.progression = progression;
+    this.upgrades = new Upgrades(state);
     this.beforeAction = () => {};
 
     this.pendingFeedCropId = null;
@@ -87,40 +88,14 @@ class UIManager {
       this.renderLog();
     });
 
-    // Buy Plot Button
-    const buyPlotBtn = document.getElementById('buy-plot-btn');
-    if (buyPlotBtn) {
-      buyPlotBtn.addEventListener('click', () => {
-        if (!this.allowAction()) return;
-        if (this.state.data.gold >= 100) {
-          const newId = this.state.data.farmPlots.reduce((max, plot) => Math.max(max, plot.id), -1) + 1;
-          if (!Number.isSafeInteger(newId)) { alert('No further plot IDs are available. Your gold was kept.'); return; }
-          this.state.data.gold -= 100;
-          this.state.data.farmPlots.push({ id: newId, state: 'empty', cropId: null, plantedAt: null, growthSec: 0 });
-          this.state.notify();
-          alert(`🎉 Success! Purchased Farm Plot #${newId + 1}`);
-        } else {
-          alert('Not enough gold! Need 100g');
-        }
-      });
-    }
-
-    // Buy Heal Kit Button
-    const buyHealBtn = document.getElementById('buy-heal-btn');
-    if (buyHealBtn) {
-      buyHealBtn.addEventListener('click', () => {
-        if (!this.allowAction()) return;
-        const pet = this.state.data.pet;
-        if (this.state.data.gold >= 30) {
-          this.state.data.gold -= 30;
-          pet.hp = Math.min(pet.maxHp, pet.hp + 30);
-          this.state.notify();
-          alert('💖 Emergency Heal Kit used! Restored 30 HP.');
-        } else {
-          alert('Not enough gold! Need 30g');
-        }
-      });
-    }
+    const shopAction = action => {
+      if (!this.allowAction()) return;
+      const result = action();
+      document.getElementById('shop-status').textContent = result.message;
+      this.renderUpgrades();
+    };
+    document.getElementById('buy-plot-btn').addEventListener('click', () => shopAction(() => this.upgrades.buyPlot()));
+    document.getElementById('buy-heal-btn').addEventListener('click', () => shopAction(() => this.upgrades.buyHealKit()));
 
     // Listen to state changes
     this.state.onChange(() => {
@@ -128,6 +103,7 @@ class UIManager {
       if (!document.getElementById('feed-modal').classList.contains('hidden')) this.renderInventory();
       if (!document.getElementById('farm-modal').classList.contains('hidden')) this.renderFarmPlots();
       if (!document.getElementById('log-modal').classList.contains('hidden')) this.renderLog();
+      if (!document.getElementById('upgrades-modal').classList.contains('hidden')) this.renderUpgrades();
     });
     document.addEventListener('keydown', event => {
       if (this.modalOverlay.classList.contains('hidden')) return;
@@ -155,6 +131,7 @@ class UIManager {
     if (modalId === 'feed-modal') this.renderInventory();
     if (modalId === 'farm-modal') this.renderFarmPlots();
     if (modalId === 'log-modal') this.renderLog();
+    if (modalId === 'upgrades-modal') this.renderUpgrades();
   }
 
   closeModals() {
@@ -192,8 +169,45 @@ class UIManager {
     // Gold
     this.goldVal.textContent = this.state.data.gold;
 
+    const gear = Upgrades.loadout(this.state.data);
+    document.getElementById('game-canvas').setAttribute('aria-label',
+      `${pet.name}, level ${pet.level}, ${Math.floor(pet.hp)} of ${Math.floor(pet.maxHp)} health. ${this.state.data.farmPlots.length} garden plots. ${gear.equipped ? CONFIG.EQUIPMENT[gear.equipped].name + ' equipped.' : 'No equipment equipped.'}`);
+
     // Toggle confirm checkbox sync
     this.toggleConfirm.checked = !!this.state.data.settings.confirmFeed;
+  }
+
+  renderUpgrades() {
+    const data = this.state.data, gear = Upgrades.loadout(data);
+    document.getElementById('equipment-status').textContent = gear.equipped
+      ? `${CONFIG.EQUIPMENT[gear.equipped].name} equipped: +${Upgrades.defenseBonus(data)} defense.`
+      : 'No equipment equipped. Purchased items remain yours when removed.';
+    document.getElementById('buy-plot-btn').disabled = !this.state.canPlay || data.gold < 100;
+    document.getElementById('buy-heal-btn').disabled = !this.state.canPlay || data.gold < 30 || data.pet.hp >= data.pet.maxHp;
+    const grid = document.getElementById('equipment-grid');
+    const focused = document.activeElement?.dataset.equipmentId;
+    grid.replaceChildren();
+    for (const item of Object.values(CONFIG.EQUIPMENT)) {
+      const card = document.createElement('div'); card.className = 'upgrade-card';
+      const title = document.createElement('h3'); title.textContent = `${item.icon} ${item.name}`;
+      const detail = document.createElement('p');
+      detail.textContent = `+${item.defense} defense · level ${item.level} · ${item.cost} gold · one-time purchase`;
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'pixel-btn';
+      button.dataset.gameAction = ''; button.dataset.equipmentId = item.id;
+      const owned = gear.owned.includes(item.id), equipped = gear.equipped === item.id;
+      button.textContent = equipped ? 'Remove' : owned ? 'Equip' : data.pet.level < item.level ? `Unlocks at level ${item.level}` : 'Purchase';
+      button.setAttribute('aria-label', `${button.textContent} ${item.name}`);
+      button.disabled = !this.state.canPlay || (!owned && (data.gold < item.cost || data.pet.level < item.level));
+      button.addEventListener('click', () => {
+        if (!this.allowAction()) return;
+        const result = owned ? this.upgrades.equip(equipped ? null : item.id) : this.upgrades.buyEquipment(item.id);
+        document.getElementById('shop-status').textContent = result.message;
+        this.renderUpgrades();
+        grid.querySelector(`[data-equipment-id="${item.id}"]`)?.focus();
+      });
+      card.append(title, detail, button); grid.appendChild(card);
+    }
+    if (focused) grid.querySelector(`[data-equipment-id="${focused}"]`)?.focus();
   }
 
   renderInventory() {

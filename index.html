@@ -9,7 +9,7 @@
 <body>
   <div id="game-container">
     <!-- Game Canvas -->
-    <canvas id="game-canvas"></canvas>
+    <canvas id="game-canvas" role="img" aria-label="Your slime companion and garden"></canvas>
 
     <!-- Top Floating HUD -->
     <div id="hud-top">
@@ -112,12 +112,16 @@
       </div>
 
       <!-- Upgrades & Shop Folder Modal -->
-      <div id="upgrades-modal" class="folder-modal hidden" role="dialog" aria-modal="true">
+      <div id="upgrades-modal" class="folder-modal hidden" role="dialog" aria-modal="true" aria-labelledby="upgrades-title">
         <div class="folder-header">
-          <h2>🪙 Upgrades & Shop</h2>
+          <h2 id="upgrades-title">🪙 Upgrades & Shop</h2>
           <button class="close-btn" aria-label="Close">&times;</button>
         </div>
         <div class="folder-body">
+          <p id="shop-status" role="status" aria-live="polite"></p>
+          <h3>Equipment</h3>
+          <p id="equipment-status"></p>
+          <div id="equipment-grid" class="equipment-grid"></div>
           <div class="upgrade-card">
             <h3>🌱 Expand Farm Plot</h3>
             <p>Add an extra planting plot to grow more food.</p>
@@ -179,6 +183,7 @@
   <script src="js/progression.js"></script>
   <script src="js/farming.js"></script>
   <script src="js/combat.js"></script>
+  <script src="js/upgrades.js"></script>
   <script src="js/renderer.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>

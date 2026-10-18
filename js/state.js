@@ -23,6 +23,7 @@ class GameState {
         maxHunger: 100, cumulativeFoodQuality: 0, requiredQualityForNextLevel: 100,
         wellFedDurationSec: 0, scale: 1 },
       gold: 50,
+      equipmentLoadout: { schemaVersion: 1, owned: [], equipped: null },
       inventory: {
         berry: { count: 3, ageHours: 0, batches: [{ count: 3, ageHours: 0 }] },
         root: { count: 1, ageHours: 0, batches: [{ count: 1, ageHours: 0 }] }
@@ -66,6 +67,14 @@ class GameState {
     for (const field of ['hp', 'hunger', 'cumulativeFoodQuality', 'wellFedDurationSec']) number(pet[field], field);
     check(pet.hp <= pet.maxHp && pet.hunger <= pet.maxHunger, 'pet stat bounds');
     number(data.gold, 'gold', 0, true);
+    // Optional on existing version-2 saves. Preserve unrelated historical fields.
+    if (Object.hasOwn(data, 'equipmentLoadout')) {
+      const gear = data.equipmentLoadout;
+      check(record(gear) && gear.schemaVersion === 1, 'equipment version');
+      check(Array.isArray(gear.owned) && gear.owned.every(id => ['leaf', 'shell', 'crystal'].includes(id)) &&
+        new Set(gear.owned).size === gear.owned.length, 'owned equipment');
+      check(gear.equipped === null || gear.owned.includes(gear.equipped), 'equipped item ownership');
+    }
     number(data.lastTimestamp, 'timestamp');
     number(data.timing.raidElapsedSec, 'raid timer');
     check(data.timing.raidElapsedSec < 90, 'raid timer range');
