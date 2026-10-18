@@ -29,8 +29,8 @@ class EncounterEngine {
     const equipmentDefense = gear?.owned.includes(gear.equipped) ? CONFIG.EQUIPMENT[gear.equipped]?.defense || 0 : 0;
     const totalDefense = d20.total + statModifier + baseDefense + equipmentDefense;
 
-    // Threat level DC scaled with pet level
-    const threatLevel = Math.floor(Math.random() * 5) + pet.level;
+    // Keep the early challenge, then grow with defense so earned levels stay viable.
+    const threatLevel = Math.floor(Math.random() * 5) + statModifier + Math.min(Math.ceil(pet.level / 2), 4);
     const encounterDC = 10 + threatLevel;
 
     let resultMsg = '';

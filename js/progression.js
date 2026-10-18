@@ -99,14 +99,18 @@ class Progression {
     while (next.cumulativeFoodQuality >= next.requiredQualityForNextLevel) {
       const nextHp = Math.max(next.maxHp + 1, Math.floor(next.maxHp * (1 + this.config.MAX_HEALTH_INCREASE_PER_LEVEL)));
       const nextScale = next.scale + this.config.SIZE_INCREASE_PER_LEVEL;
+      // Existing saves keep their current threshold. Only future growth is independent of care HP.
+      const nextRequirement = Math.max(next.requiredQualityForNextLevel + 1,
+        Math.floor(next.requiredQualityForNextLevel * (1 + this.config.QUALITY_REQUIREMENT_INCREASE_PER_LEVEL)));
       if (!Number.isSafeInteger(nextHp) || !Number.isSafeInteger(next.level + 1) ||
-          !bounded(nextScale) || nextScale <= next.scale) return refuse();
+          !bounded(nextScale) || nextScale <= next.scale || !bounded(nextRequirement) ||
+          nextRequirement <= next.requiredQualityForNextLevel) return refuse();
       next.cumulativeFoodQuality -= next.requiredQualityForNextLevel;
       next.level += 1;
       next.scale = nextScale;
       next.maxHp = nextHp;
       next.hp = nextHp;
-      next.requiredQualityForNextLevel = nextHp;
+      next.requiredQualityForNextLevel = nextRequirement;
       messages.push(`LEVEL UP! Your slime reached level ${next.level}; maximum health is ${next.maxHp}.`);
     }
     Object.assign(pet, next);
