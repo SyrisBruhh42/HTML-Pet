@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Pet save recovery test fixtures</title>
+<style>body{font:16px system-ui;margin:16px}button{padding:10px;margin:5px}iframe{width:100%;height:760px;border:2px solid #555}</style>
+<h1>Disposable pet save fixtures</h1>
+<p>This page runs the real game in an embedded test frame. All fixture saves use their own storage prefix; the normal game save is untouched. Close other fixture frames before starting another case.</p>
+<button data-case="fresh">Fresh pet</button><button data-case="legacy">Legacy save</button>
+<button data-case="corrupt">Corrupt save</button><button data-case="future">Future save version</button>
+<button data-case="read-failure">Read failure</button><button data-case="write-failure">Write failure</button>
+<button data-case="clock-backwards">Clock backwards</button>
+<p id="result" role="status">Choose a fixture.</p><div id="frame"></div>
+<script src="../js/state.js"></script>
+<script>
+const rawCorrupt = '{BROKEN-RAW-HTMLPET-FIXTURE}';
+document.querySelectorAll('[data-case]').forEach(button => button.addEventListener('click', async () => {
+  document.getElementById('frame').replaceChildren();
+  const scenario = button.dataset.case;
+  const prefix = `html-pet-fixture-${scenario}:`;
+  const key = 'pixel_pet_save_v1';
+  const data = GameState.fresh(Date.now());
+  if (scenario === 'legacy') {
+    delete data.schemaVersion; delete data.timing;
+    data.pet.level = 7; data.pet.maxHp = 177; data.pet.hp = 170; data.gold = 345;
+    data.inventory.berry = { count: 7, ageHours: 4 };
+    for (const item of Object.values(data.inventory)) delete item.batches;
+    for (const plot of data.farmPlots) delete plot.growthSec;
+  }
+  if (scenario === 'future') data.schemaVersion = 99;
+  if (scenario === 'clock-backwards') data.lastTimestamp += 3600000;
+  const raw = scenario === 'corrupt' ? rawCorrupt : JSON.stringify(data, null, 2);
+  localStorage.setItem(prefix + key, raw);
+  const source = await (await fetch('../index.html')).text();
+  const setup = `const nativeStorage = window.localStorage;
+    const prefix = ${JSON.stringify(prefix)}, scenario = ${JSON.stringify(scenario)};
+    const keys = () => Object.keys(nativeStorage).filter(k => k.startsWith(prefix));
+    const wrapped = {
+      getItem(key) { if (scenario === 'read-failure') throw new Error('Fixture: storage read denied'); return nativeStorage.getItem(prefix + key); },
+      setItem(key, value) { if (scenario === 'write-failure') throw new Error('Fixture: storage quota exceeded'); nativeStorage.setItem(prefix + key, value); },
+      get length() { return keys().length; }, key(i) { return keys()[i]?.slice(prefix.length) ?? null; }
+    };
+    Object.defineProperty(window, 'localStorage', { value: wrapped });`;
+  const frame = document.createElement('iframe'); frame.title = `${scenario} game fixture`;
+  frame.srcdoc = source.replace('<head>', `<head><base href="${new URL('../', location.href)}"><script>${setup}<\/script>`);
+  document.getElementById('frame').appendChild(frame);
+  document.getElementById('result').textContent = `Running ${scenario}. Test storage prefix: ${prefix}`;
+}));
+</script></html>

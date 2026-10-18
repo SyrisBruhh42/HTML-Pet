@@ -19,7 +19,8 @@ class EncounterEngine {
     this.state = state;
   }
 
-  triggerRaid() {
+  triggerRaid({ persist = true } = {}) {
+    if (!this.state.canPlay) return null;
     const pet = this.state.data.pet;
     const d20 = DiceEngine.roll(1, 20);
     const statModifier = Math.floor(pet.level / 2);
@@ -36,24 +37,32 @@ class EncounterEngine {
     if (d20.total === 20) {
       // Natural 20
       const rewardGold = 25 * pet.level;
+      if (this.state.data.gold > Number.MAX_SAFE_INTEGER - rewardGold || !Number.isSafeInteger(rewardGold)) {
+        this.state.pause('progress-limit', 'Pet paused at the supported gold limit. Download your current pet; its progress has been preserved.');
+        return null;
+      }
       this.state.data.gold += rewardGold;
       resultMsg = `🌟 CRITICAL VICTORY! Nat 20 roll! Defense check ${totalDefense} vs DC ${encounterDC}. Pet defended perfectly and gained ${rewardGold} gold!`;
       type = 'crit-win';
     } else if (totalDefense >= encounterDC) {
       // Standard Success
       const rewardGold = 10 * pet.level;
+      if (this.state.data.gold > Number.MAX_SAFE_INTEGER - rewardGold || !Number.isSafeInteger(rewardGold)) {
+        this.state.pause('progress-limit', 'Pet paused at the supported gold limit. Download your current pet; its progress has been preserved.');
+        return null;
+      }
       this.state.data.gold += rewardGold;
       resultMsg = `⚔️ VICTORY! Defense check ${totalDefense} (Roll ${d20.total} + ${statModifier}) vs DC ${encounterDC}. Pet repelled the raid and earned ${rewardGold} gold!`;
       type = 'win';
     } else if (d20.total === 1) {
       // Critical Fail
-      const damage = Math.min(pet.hp, Math.floor(pet.maxHp * 0.20));
+      const damage = Math.min(Math.max(0, pet.hp - 1), Math.floor(pet.maxHp * 0.20));
       pet.hp -= damage;
       resultMsg = `💀 CRITICAL FAILURE! Nat 1 roll! Pet suffered ${damage} damage in ambush!`;
       type = 'crit-loss';
     } else {
       // Standard Loss
-      const damage = Math.min(pet.hp, Math.floor(pet.maxHp * 0.08));
+      const damage = Math.min(Math.max(0, pet.hp - 1), Math.floor(pet.maxHp * 0.08));
       pet.hp -= damage;
       resultMsg = `💔 DEFEAT! Defense check ${totalDefense} vs DC ${encounterDC}. Raid broke through and pet took ${damage} damage!`;
       type = 'loss';
@@ -70,7 +79,7 @@ class EncounterEngine {
       this.state.data.logs.pop();
     }
 
-    this.state.notify();
+    if (persist) this.state.notify();
     return { d20: d20.total, totalDefense, encounterDC, resultMsg, type };
   }
 }

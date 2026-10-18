@@ -3,7 +3,11 @@ const CONFIG = {
   HEALTH_DECAY_PER_HOUR: 0.01, // 1% per hour
   HUNGER_DECAY_PER_HOUR: 0.04, // 4% per hour
   WELL_FED_HUNGER_THRESHOLD: 90, // % hunger to be considered well-fed
-  HEALTH_INCREASE_REQ_HOURS: 24, // 24 hours of full health & food required to increase health on feed
+  WELL_FED_HEALTH_RATIO: 0.9,
+  HEALTH_INCREASE_REQ_HOURS: 24, // Banked eligible care; pauses when hungry or hurt.
+  CARE_HEALTH_REWARD: 10,
+  RAID_INTERVAL_SEC: 90,
+  MAX_ACTIVE_GAP_SEC: 5, // Longer browser suspensions follow the away rule.
 
   // Growth
   SIZE_INCREASE_PER_LEVEL: 0.01, // 1% per level up

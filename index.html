@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pixel Slime Companion</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -49,6 +49,35 @@
       </div>
     </div>
 
+    <div id="care-card" class="stat-card"><span id="care-text"></span></div>
+    <section id="save-panel" aria-label="Pet saving and recovery">
+      <p id="save-status" role="status"></p>
+      <p id="clock-status" role="status" hidden></p>
+      <details id="save-tools">
+        <summary>Save, backup and recovery</summary>
+        <div class="save-actions">
+          <button id="export-save-btn" class="pixel-btn">Download current pet</button>
+          <button id="export-original-btn" class="pixel-btn">Download original save</button>
+          <button id="retry-save-btn" class="pixel-btn">Retry load / save</button>
+          <label class="import-label">Import backup <input id="import-save" type="file" accept=".json,application/json"></label>
+          <label>Saved recovery copies <select id="recovery-select"></select></label>
+          <button id="export-recovery-btn" class="pixel-btn">Download selected recovery</button>
+          <button id="new-pet-btn" class="pixel-btn danger">Start a new pet</button>
+        </div>
+        <details>
+          <summary>Restore from backup text</summary>
+          <label for="import-text">Paste backup JSON</label>
+          <textarea id="import-text" rows="4" spellcheck="false"></textarea>
+          <button id="import-text-btn" class="pixel-btn">Restore pasted backup</button>
+        </details>
+        <div id="backup-preview" hidden>
+          <label for="backup-text">Backup text (if the download is blocked, copy this into a .json file)</label>
+          <textarea id="backup-text" readonly rows="5" spellcheck="false"></textarea>
+        </div>
+        <p>Keep downloads somewhere safe. Browser storage can be cleared; use one game tab at a time.</p>
+      </details>
+    </section>
+
     <!-- Quick Action / Menu Buttons Bar -->
     <div id="hud-bottom">
       <button class="pixel-btn nav-btn" data-target="feed-modal">🍎 Inventory</button>
@@ -60,15 +89,15 @@
     <!-- Modals / Folder Popups -->
     <div id="modal-overlay" class="hidden">
       <!-- Feeding & Inventory Folder Modal -->
-      <div id="feed-modal" class="folder-modal hidden">
+      <div id="feed-modal" class="folder-modal hidden" role="dialog" aria-modal="true">
         <div class="folder-header">
           <h2>📁 Food & Inventory Folder</h2>
-          <button class="close-btn">&times;</button>
+          <button class="close-btn" aria-label="Close">&times;</button>
         </div>
         <div class="folder-body">
           <div class="toggle-setting">
             <label class="switch-label">
-              <input type="checkbox" id="toggle-confirm">
+              <input type="checkbox" id="toggle-confirm" data-game-action>
               <span class="slider"></span>
               <span class="toggle-text">Require Confirmation on Feed</span>
             </label>
@@ -83,32 +112,32 @@
       </div>
 
       <!-- Upgrades & Shop Folder Modal -->
-      <div id="upgrades-modal" class="folder-modal hidden">
+      <div id="upgrades-modal" class="folder-modal hidden" role="dialog" aria-modal="true">
         <div class="folder-header">
           <h2>🪙 Upgrades & Shop</h2>
-          <button class="close-btn">&times;</button>
+          <button class="close-btn" aria-label="Close">&times;</button>
         </div>
         <div class="folder-body">
           <div class="upgrade-card">
             <h3>🌱 Expand Farm Plot</h3>
             <p>Add an extra planting plot to grow more food.</p>
             <p><strong>Cost: 100 Gold</strong></p>
-            <button id="buy-plot-btn" class="pixel-btn success">Purchase Plot</button>
+            <button id="buy-plot-btn" data-game-action class="pixel-btn success">Purchase Plot</button>
           </div>
           <div class="upgrade-card" style="margin-top: 12px;">
             <h3>💖 Heal Pet Emergency Kit</h3>
             <p>Instantly restore 30 HP to your slime companion.</p>
             <p><strong>Cost: 30 Gold</strong></p>
-            <button id="buy-heal-btn" class="pixel-btn primary">Buy Heal Kit</button>
+            <button id="buy-heal-btn" data-game-action class="pixel-btn primary">Buy Heal Kit</button>
           </div>
         </div>
       </div>
 
       <!-- Farm / Plots Folder Modal -->
-      <div id="farm-modal" class="folder-modal hidden">
+      <div id="farm-modal" class="folder-modal hidden" role="dialog" aria-modal="true">
         <div class="folder-header">
           <h2>🌱 Farm Plots Folder</h2>
-          <button class="close-btn">&times;</button>
+          <button class="close-btn" aria-label="Close">&times;</button>
         </div>
         <div class="folder-body">
           <div id="plots-container" class="plots-grid">
@@ -118,14 +147,14 @@
       </div>
 
       <!-- Combat / Event Log Modal -->
-      <div id="log-modal" class="folder-modal hidden">
+      <div id="log-modal" class="folder-modal hidden" role="dialog" aria-modal="true">
         <div class="folder-header">
           <h2>📜 D&D Encounter Log</h2>
-          <button class="close-btn">&times;</button>
+          <button class="close-btn" aria-label="Close">&times;</button>
         </div>
         <div class="folder-body">
           <div class="raid-controls">
-            <button id="trigger-raid-btn" class="pixel-btn primary">⚔️ Trigger Raid Check (Test D20)</button>
+            <button id="trigger-raid-btn" data-game-action class="pixel-btn primary">⚔️ Trigger Raid Check (Test D20)</button>
           </div>
           <div id="combat-log" class="log-list">
             <!-- Log entries go here -->
@@ -138,7 +167,7 @@
         <h3>Confirm Feed</h3>
         <p id="confirm-dialog-msg">Are you sure you want to feed this item to your slime?</p>
         <div class="dialog-actions">
-          <button id="confirm-yes-btn" class="pixel-btn success">Feed Pet</button>
+          <button id="confirm-yes-btn" data-game-action class="pixel-btn success">Feed Pet</button>
           <button id="confirm-no-btn" class="pixel-btn danger">Cancel</button>
         </div>
       </div>
@@ -147,6 +176,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/state.js"></script>
+  <script src="js/progression.js"></script>
   <script src="js/farming.js"></script>
   <script src="js/combat.js"></script>
   <script src="js/renderer.js"></script>

@@ -7,6 +7,7 @@ class FarmingManager {
   }
 
   plantSeed(plotId, cropId) {
+    if (!this.state.canPlay) return false;
     const plot = this.state.data.farmPlots.find(p => p.id === plotId);
     const cropConfig = CONFIG.CROPS[cropId];
     if (!plot || plot.state !== 'empty' || !cropConfig) return false;
@@ -18,49 +19,42 @@ class FarmingManager {
     this.state.data.gold -= cropConfig.seedCost;
     plot.state = 'planted';
     plot.cropId = cropId;
-    plot.plantedAt = Date.now();
+    plot.plantedAt = this.state.data.lastTimestamp;
+    plot.growthSec = 0;
     this.state.notify();
     return { success: true };
   }
 
   harvestPlot(plotId) {
+    if (!this.state.canPlay) return false;
     const plot = this.state.data.farmPlots.find(p => p.id === plotId);
     if (!plot || plot.state !== 'ready' || !plot.cropId) return false;
 
     const cropId = plot.cropId;
     // Add to inventory
     if (!this.state.data.inventory[cropId]) {
-      this.state.data.inventory[cropId] = { count: 0, ageHours: 0 };
+      this.state.data.inventory[cropId] = { count: 0, ageHours: 0, batches: [] };
     }
-    this.state.data.inventory[cropId].count += 1;
+    const item = this.state.data.inventory[cropId];
+    item.count += 1;
+    const latest = item.batches[item.batches.length - 1];
+    if (latest && latest.ageHours === 0) latest.count += 1;
+    else item.batches.push({ count: 1, ageHours: 0 });
+    item.ageHours = item.batches[0].ageHours;
 
     // Reset plot
     plot.state = 'empty';
     plot.cropId = null;
     plot.plantedAt = null;
+    plot.growthSec = 0;
 
     this.state.notify();
     return { success: true, cropId };
   }
 
   updatePlots() {
-    const now = Date.now();
-    let updated = false;
-
-    this.state.data.farmPlots.forEach(plot => {
-      if (plot.state === 'planted' && plot.cropId) {
-        const cropConfig = CONFIG.CROPS[plot.cropId];
-        const elapsedSec = (now - plot.plantedAt) / 1000;
-        if (elapsedSec >= cropConfig.growTimeSec) {
-          plot.state = 'ready';
-          updated = true;
-        }
-      }
-    });
-
-    if (updated) {
-      this.state.notify();
-    }
+    // Time and crop completion are advanced together by Progression.advanceTo.
+    return this.state.data.farmPlots.filter(plot => plot.state === 'ready');
   }
 }
 
