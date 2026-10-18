@@ -3,6 +3,7 @@ class App {
   constructor() {
     this.state = window.gameState;
     this.writerLease = false;
+    this.sessionGeneration = 0;
     this.state.writerCheck = () => this.writerLease;
     this.renderer = new Renderer(document.getElementById('game-canvas'), this.state);
     this.progression = new Progression(this.state);
@@ -18,6 +19,7 @@ class App {
       if (this.state.canPlay) this.state.notify();
     });
     window.addEventListener('pagehide', () => {
+      this.sessionGeneration += 1; // A delayed lock grant must not reopen a hidden/disposed page.
       this.advance(false);
       if (this.state.canPlay) this.state.save();
       this.writerLease = false;
@@ -35,6 +37,10 @@ class App {
   }
 
   openSession() {
+    const generation = ++this.sessionGeneration;
+    this.releaseWriter?.();
+    this.releaseWriter = null;
+    this.writerLease = false;
     this.state.canPlay = false;
     if (!navigator.locks?.request) {
       this.state.load();
@@ -42,6 +48,7 @@ class App {
       return;
     }
     navigator.locks.request(`${this.state.key}:writer`, { mode: 'exclusive', ifAvailable: true }, async lock => {
+      if (generation !== this.sessionGeneration) return;
       if (!lock) {
         this.state.load();
         this.state.pause('writer-blocked', 'Another game tab owns this pet’s save session. Close it and reload here. You can still download the stored pet.');
@@ -51,6 +58,7 @@ class App {
       if (this.state.load()) this.processOfflineTime();
       await new Promise(resolve => { this.releaseWriter = resolve; });
     }).catch(() => {
+      if (generation !== this.sessionGeneration) return;
       this.writerLease = false;
       this.state.pause('writer-blocked', 'The browser could not establish an exclusive save session. Reload after closing other game tabs. Your stored pet has not been replaced.');
     });

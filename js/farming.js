@@ -31,6 +31,12 @@ class FarmingManager {
     if (!plot || plot.state !== 'ready' || !plot.cropId) return false;
 
     const cropId = plot.cropId;
+    const existing = this.state.data.inventory[cropId];
+    if (existing && (!Number.isSafeInteger(existing.count + 1) ||
+        (existing.batches.at(-1)?.ageHours === 0 && !Number.isSafeInteger(existing.batches.at(-1).count + 1)))) {
+      this.state.pause('progress-limit', 'Pet paused at the supported food capacity. Your ready crop and existing food were kept. Download your pet before continuing with a newer game version.');
+      return { success: false, reason: 'Food capacity reached; ready crop kept.' };
+    }
     // Add to inventory
     if (!this.state.data.inventory[cropId]) {
       this.state.data.inventory[cropId] = { count: 0, ageHours: 0, batches: [] };

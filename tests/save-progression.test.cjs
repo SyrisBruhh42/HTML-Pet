@@ -323,3 +323,73 @@ test('the default storage API is read-only without an explicit writer lease', ()
   assert.equal(storage.length, 1);
   assert.equal(JSON.parse(state.exportCurrent()).gold, 50);
 });
+
+test('full food capacity never spends a harvest or makes the current save unimportable', () => {
+  const { state, farm } = fresh();
+  state.data.inventory.berry = { count: Number.MAX_SAFE_INTEGER, ageHours: 0, batches: [{ count: Number.MAX_SAFE_INTEGER, ageHours: 0 }] };
+  state.data.farmPlots[0] = { id: 0, state: 'ready', cropId: 'berry', plantedAt: EPOCH, growthSec: 30 };
+  const before = state.exportCurrent();
+  assert.equal(farm.harvestPlot(0).success, false);
+  assert.equal(state.exportCurrent(), before);
+  assert.doesNotThrow(() => GameState.decode(state.exportCurrent(), EPOCH));
+});
+
+test('level, size and health limits abort the whole feeding before spending progress', () => {
+  for (const field of ['level', 'scale', 'maxHp']) {
+    const { state, progression } = fresh();
+    state.data.pet[field] = Number.MAX_SAFE_INTEGER;
+    state.data.pet.cumulativeFoodQuality = 100;
+    const before = state.exportCurrent();
+    assert.equal(progression.feed('berry'), false);
+    assert.equal(state.exportCurrent(), before);
+    assert.doesNotThrow(() => GameState.decode(state.exportCurrent(), EPOCH));
+  }
+});
+
+test('currency and time counters refuse overflow without lossy clamps', () => {
+  const { state, progression } = fresh();
+  state.data.gold = Number.MAX_SAFE_INTEGER;
+  const originalRoll = DiceEngine.roll;
+  try {
+    DiceEngine.roll = () => ({total:20,rolls:[20]});
+    const before = state.exportCurrent();
+    assert.equal(new EncounterEngine(state).triggerRaid(), null);
+    assert.equal(state.exportCurrent(), before);
+  } finally { DiceEngine.roll = originalRoll; }
+  for (const field of ['care', 'age']) {
+    state.canPlay = true;
+    state.data.pet.wellFedDurationSec = field === 'care' ? Number.MAX_SAFE_INTEGER : 0;
+    state.data.inventory.berry.batches[0].ageHours = field === 'age' ? Number.MAX_SAFE_INTEGER : 0;
+    state.data.inventory.berry.ageHours = state.data.inventory.berry.batches[0].ageHours;
+    const before = state.exportCurrent();
+    assert.equal(progression.advanceTo(EPOCH + 3600000).seconds, 0);
+    assert.equal(state.exportCurrent(), before);
+    assert.doesNotThrow(() => GameState.decode(state.exportCurrent(), EPOCH));
+  }
+});
+
+test('a late writer grant after pagehide cannot load or save, and the restored page can acquire', async () => {
+  const requests = [];
+  global.navigator = { locks: { request(name, options, callback) {
+    let resolve, reject; const promise = new Promise((yes, no) => {resolve = yes; reject = no;});
+    requests.push({ callback, resolve, reject }); return promise;
+  } } };
+  const { state, storage } = fresh();
+  const app = { state, sessionGeneration: 0, writerLease: false, processOfflineTime() { state.save(); } };
+  state.writerCheck = () => app.writerLease;
+  try {
+    App.prototype.openSession.call(app);
+    // pagehide invalidates the generation before the asynchronous lock grant arrives.
+    app.sessionGeneration += 1; app.writerLease = false; state.canPlay = false;
+    await requests[0].callback({ name: 'late grant' }); requests[0].resolve();
+    assert.equal(state.canPlay, false); assert.equal(app.writerLease, false);
+    assert.equal(storage.getItem(KEY), null);
+    App.prototype.openSession.call(app);
+    const held = requests[1].callback({ name: 'restored grant' });
+    assert.equal(app.writerLease, true); assert.equal(state.canPlay, true);
+    assert.equal(JSON.parse(storage.getItem(KEY)).gold, 50);
+    app.sessionGeneration += 1; app.writerLease = false; state.canPlay = false;
+    app.releaseWriter(); await held; requests[1].resolve();
+    assert.equal(app.writerLease, false);
+  } finally { delete global.navigator; }
+});

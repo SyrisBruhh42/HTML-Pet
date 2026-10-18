@@ -37,7 +37,7 @@ class EncounterEngine {
     if (d20.total === 20) {
       // Natural 20
       const rewardGold = 25 * pet.level;
-      if (this.state.data.gold > Number.MAX_SAFE_INTEGER - rewardGold || !Number.isSafeInteger(rewardGold)) {
+      if (!Number.isSafeInteger(this.state.data.gold + rewardGold) || !Number.isSafeInteger(rewardGold)) {
         this.state.pause('progress-limit', 'Pet paused at the supported gold limit. Download your current pet; its progress has been preserved.');
         return null;
       }
@@ -47,7 +47,7 @@ class EncounterEngine {
     } else if (d20.total !== 1 && totalDefense >= encounterDC) {
       // Standard Success
       const rewardGold = 10 * pet.level;
-      if (this.state.data.gold > Number.MAX_SAFE_INTEGER - rewardGold || !Number.isSafeInteger(rewardGold)) {
+      if (!Number.isSafeInteger(this.state.data.gold + rewardGold) || !Number.isSafeInteger(rewardGold)) {
         this.state.pause('progress-limit', 'Pet paused at the supported gold limit. Download your current pet; its progress has been preserved.');
         return null;
       }
